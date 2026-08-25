@@ -51,13 +51,10 @@ git push -u origin main
 
 Do **not** commit `server/.env` or `node_modules`.
 
-### 3. Hostinger Node.js app
-1. Create a **Node.js** website / app (or VPS).
-2. Connect the GitHub repo (or upload the project).
-3. Set application root to the project folder that contains root `package.json`.
-4. **Build command:** `npm run build`  
-5. **Start command:** `npm start`  
-6. Create `server/.env` on the server (File Manager or SSH):
+### Hostinger Node version
+This project builds on **Node 18.18+** (Hostinger default `v18.20.x` is OK).
+
+If the panel allows Node 20, you can use that too — not required after the Node-18-compatible dependency pin.
 
 ```env
 PORT=3000
