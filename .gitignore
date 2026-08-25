@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+server/.env
+client/.env
+client/.env.production.local
+
+# Builds
+client/dist/
+dist/
+build/
+
+# Uploads (keep folder via .gitkeep on server)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Logs / OS / IDE
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Misc local scratch
+dev-css.css
+hopeland-source.html
+*.tmp

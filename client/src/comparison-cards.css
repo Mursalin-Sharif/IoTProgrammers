@@ -1,0 +1,134 @@
+.ip-scope-section {
+  width: 100%;
+  background: #f0fdfa;
+  border: 0;
+  border-radius: 28px;
+  box-shadow: none;
+  padding: 28px 16px 32px;
+  color: #0f172a;
+  text-align: center;
+}
+
+.ip-scope-header {
+  max-width: 640px;
+  margin: 0 auto 28px;
+}
+
+.ip-scope-header h2 {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.25;
+}
+
+.ip-scope-header h2 span {
+  color: #008744;
+}
+
+.ip-scope-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.ip-scope-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 30px;
+  max-width: 1050px;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+.ip-scope-card {
+  flex: 1;
+  padding: 35px 30px;
+  border-radius: 20px;
+  text-align: left;
+  box-sizing: border-box;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.ip-scope-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 30px rgb(0 0 0 / 0.08);
+}
+
+.ip-scope-included {
+  background: #ffffff;
+  border: 1.5px solid #d1fae5;
+  box-shadow: 0 4px 15px rgb(0 0 0 / 0.02);
+}
+
+.ip-scope-excluded {
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  box-shadow: 0 4px 15px rgb(239 68 68 / 0.03);
+}
+
+.ip-scope-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 28px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ip-scope-included h3 {
+  color: #008744;
+}
+
+.ip-scope-excluded h3 {
+  color: #b91c1c;
+}
+
+.ip-scope-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ip-scope-card li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ip-scope-card li:last-child {
+  margin-bottom: 0;
+}
+
+.ip-scope-mark {
+  margin-right: 14px;
+  margin-top: 1px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ip-scope-included .ip-scope-mark {
+  color: #008744;
+}
+
+.ip-scope-excluded .ip-scope-mark {
+  color: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .ip-scope-wrap {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ip-scope-card {
+    width: 100%;
+  }
+}

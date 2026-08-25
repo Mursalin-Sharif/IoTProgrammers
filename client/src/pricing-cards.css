@@ -1,0 +1,208 @@
+.ip-pricing-section {
+  width: 100%;
+  background: #f8fafc;
+  border: 0;
+  border-radius: 28px;
+  box-shadow: none;
+  padding: 42px 20px 36px;
+  color: #0f172a;
+  text-align: center;
+}
+
+.ip-pricing-header {
+  max-width: 640px;
+  margin: 0 auto 36px;
+}
+
+.ip-pricing-header h2 {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.ip-pricing-header h2 span {
+  color: #00a852;
+}
+
+.ip-pricing-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.ip-pricing-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 30px;
+  max-width: 1150px;
+  margin: 0 auto;
+}
+
+.ip-pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  max-width: 480px;
+  padding: 34px 28px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 4px 15px rgb(0 0 0 / 0.04);
+  text-align: left;
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+.ip-pricing-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  border-color: #cbd5e1;
+  box-shadow: 0 20px 35px rgb(0 0 0 / 0.12);
+}
+
+.ip-pricing-card.is-featured {
+  border: 2px solid #00a852;
+  transform: scale(1.03);
+  box-shadow: 0 8px 25px rgb(0 168 82 / 0.15);
+}
+
+.ip-pricing-card.is-featured:hover {
+  transform: translateY(-12px) scale(1.05);
+  box-shadow: 0 25px 45px rgb(0 168 82 / 0.25);
+}
+
+.ip-pricing-badge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #00a852;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 10px rgb(0 168 82 / 0.3);
+  white-space: nowrap;
+}
+
+.ip-pricing-card h3 {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.ip-pricing-card .ip-pricing-sub {
+  margin: 0 0 22px;
+  color: #8e9aaf;
+  font-size: 13px;
+}
+
+.ip-price-table {
+  width: 100%;
+  margin-bottom: 24px;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.ip-price-table th,
+.ip-price-table td {
+  padding: 11px 14px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ip-price-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ip-price-table th:last-child,
+.ip-price-table td:last-child {
+  text-align: right;
+}
+
+.ip-price-table td {
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ip-price-table tbody tr:nth-child(even) td {
+  background: #fcfcfc;
+}
+
+.ip-price-table .ip-price {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ip-price-table .is-highlight td {
+  color: #00a852;
+  font-weight: 600;
+}
+
+.ip-price-table .is-highlight .ip-price {
+  color: #00a852;
+}
+
+.ip-pricing-features {
+  flex-grow: 1;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.ip-pricing-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 11px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ip-pricing-check {
+  color: #00a852;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.ip-pricing-note {
+  margin: auto 0 0;
+  padding-top: 12px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .ip-pricing-wrap {
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+  }
+
+  .ip-pricing-card,
+  .ip-pricing-card.is-featured {
+    width: 100%;
+    max-width: 520px;
+    transform: none;
+  }
+
+  .ip-pricing-card.is-featured:hover {
+    transform: translateY(-8px);
+  }
+}

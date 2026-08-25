@@ -1,0 +1,630 @@
+/* ---------------------------------------------------------------------------
+   Seamless Color Transition System — IoTProgrammers
+   Soft edge blends between major page sections (CSS-only overlays).
+   --------------------------------------------------------------------------- */
+
+:root {
+  --section-navy: #081120;
+  --section-card: #0f1b31;
+  --section-reviews: #06150e;
+  --section-reviews-mid: #0a2012;
+  --section-pricing: #f8fafc;
+  --section-scope: #f0fdfa;
+  --section-cream: #faf8f3;
+  --section-hero-green: #0a2e1a;
+  --section-contact-dark: #0b1a13;
+  --section-contact-light: #eef2f5;
+  --section-reach: #f8fafc;
+  --section-cta: #ffffff;
+  --section-booking-top: #0c683c;
+  --section-booking-bottom: #084c2b;
+  --section-footer: #0f3d2e;
+  --blend-height: clamp(56px, 9vw, 110px);
+  --blend-height-sm: clamp(40px, 6vw, 72px);
+}
+
+/* Shared blend helpers ---------------------------------------------------- */
+
+.section-blend {
+  position: relative;
+  isolation: isolate;
+}
+
+.section-blend::before,
+.section-blend::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.section-blend::before {
+  top: 0;
+  background: linear-gradient(
+    180deg,
+    var(--blend-prev, transparent) 0%,
+    color-mix(in srgb, var(--blend-prev, transparent) 55%, transparent) 42%,
+    transparent 100%
+  );
+}
+
+.section-blend::after {
+  bottom: 0;
+  background: linear-gradient(
+    0deg,
+    var(--blend-next, transparent) 0%,
+    color-mix(in srgb, var(--blend-next, transparent) 55%, transparent) 42%,
+    transparent 100%
+  );
+}
+
+/* Bottom-only / top-only variants when a section already uses a pseudo */
+.section-blend-bottom {
+  position: relative;
+  isolation: isolate;
+}
+
+.section-blend-bottom::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--blend-next, transparent) 0%,
+    color-mix(in srgb, var(--blend-next, transparent) 55%, transparent) 42%,
+    transparent 100%
+  );
+}
+
+.section-blend-top-wash {
+  background-image:
+    linear-gradient(
+      180deg,
+      var(--blend-prev) 0%,
+      color-mix(in srgb, var(--blend-prev) 45%, transparent) 38%,
+      transparent var(--blend-height)
+    ),
+    var(--section-wash-rest, none);
+}
+
+/* Carousel-safe: keep overflow visible for arrows, clip only blend edges via height */
+.section-blend--carousel {
+  --blend-height: var(--blend-height-sm);
+}
+
+.section-blend--carousel.section-blend::before,
+.section-blend--carousel.section-blend::after,
+.section-blend--carousel.section-blend-bottom::after {
+  z-index: 5;
+}
+
+/* Continuous stacks: no hard gap / card divider look ------------------------- */
+
+.landing-page.page-stack,
+.home-page.page-stack {
+  gap: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.landing-page > section,
+.home-page > section {
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Landing ----------------------------------------------------------------- */
+
+.landing-intro-hero {
+  position: relative;
+  isolation: isolate;
+  margin-bottom: 0;
+  padding-bottom: calc(var(--blend-height-sm) + 8px);
+}
+
+.landing-intro-hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-card) 0%,
+    color-mix(in srgb, var(--section-card) 50%, transparent) 45%,
+    transparent 100%
+  );
+}
+
+.landing-demos-section {
+  --blend-prev: var(--section-navy);
+  --blend-next: var(--section-reviews);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 28px 12px 48px;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgb(28 199 184 / 0.08), transparent 55%),
+    linear-gradient(180deg, var(--section-card) 0%, #0c1628 100%);
+}
+
+.landing-demos-section .landing-demo-stack {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.landing-page > .reviews-section {
+  --blend-prev: var(--section-card);
+  --blend-next: var(--section-pricing);
+  --blend-height: var(--blend-height-sm);
+  border-radius: 0;
+  margin: 0;
+  padding-top: 48px;
+  padding-bottom: 56px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--section-card) 70%, var(--section-reviews)) 0%, var(--section-reviews) 18%),
+    var(--section-reviews);
+}
+
+.landing-page > .ip-pricing-section {
+  --blend-prev: var(--section-reviews);
+  --blend-next: var(--section-scope);
+  border-radius: 0;
+  padding-top: 56px;
+  padding-bottom: 52px;
+  background:
+    linear-gradient(180deg, var(--section-reviews) 0%, transparent var(--blend-height-sm)),
+    var(--section-pricing);
+}
+
+.landing-page > .ip-scope-section {
+  --blend-prev: var(--section-pricing);
+  --blend-next: var(--section-card);
+  border-radius: 0;
+  padding-top: 48px;
+  padding-bottom: 52px;
+  background:
+    linear-gradient(180deg, var(--section-pricing) 0%, transparent var(--blend-height-sm)),
+    var(--section-scope);
+}
+
+.landing-gallery-section {
+  --blend-prev: var(--section-scope);
+  --blend-next: var(--section-card);
+  padding: 48px 16px 52px;
+  background:
+    linear-gradient(180deg, var(--section-scope) 0%, transparent var(--blend-height-sm)),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgb(28 199 184 / 0.06), transparent 55%),
+    var(--section-card);
+}
+
+.landing-page > .landing-faq-section {
+  --blend-prev: var(--section-card);
+  --blend-next: var(--section-footer);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 48px 16px 64px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--section-card) 80%, #0c1628) 0%, var(--section-card) 30%),
+    var(--section-card);
+}
+
+.landing-page > .landing-faq-section .landing-faq-list {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+/* Home -------------------------------------------------------------------- */
+
+.home-page > .hero-banner-section {
+  --blend-next: var(--section-cream);
+  margin-bottom: 0;
+}
+
+/* Prefer section-blend::after; keep a stronger z-index wash over slides */
+.home-page > .hero-banner-section.section-blend::after {
+  z-index: 6;
+  background: linear-gradient(
+    0deg,
+    var(--section-cream) 0%,
+    color-mix(in srgb, var(--section-cream) 55%, transparent) 48%,
+    transparent 100%
+  );
+}
+
+.home-page > .feature-section {
+  --blend-prev: var(--section-hero-green);
+  --blend-next: var(--section-card);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 48px 16px 56px;
+  background:
+    linear-gradient(180deg, var(--section-hero-green) 0%, transparent var(--blend-height-sm)),
+    radial-gradient(ellipse 80% 45% at 50% 0%, rgb(15 107 58 / 0.06), transparent 50%),
+    var(--section-cream);
+}
+
+.home-page > .hero-banner-section + .feature-section {
+  margin-top: 0;
+}
+
+.home-page > .feature-section .feature-carousel-shell,
+.home-page > .feature-section .feature-grid,
+.home-page > .feature-section .feature-section-footer-wrap {
+  width: min(1152px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.home-page > .products-section {
+  --blend-prev: var(--section-cream);
+  --blend-next: var(--section-pricing);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 48px 12px 56px;
+  background:
+    linear-gradient(180deg, var(--section-cream) 0%, transparent var(--blend-height-sm)),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgb(28 199 184 / 0.07), transparent 55%),
+    var(--section-card);
+}
+
+.home-page > .products-section .products-offer-bar,
+.home-page > .products-section .products-grid {
+  width: min(1152px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.home-page > .ip-pricing-section {
+  --blend-prev: var(--section-card);
+  --blend-next: var(--section-scope);
+  border-radius: 0;
+  padding-top: 56px;
+  padding-bottom: 52px;
+  background:
+    linear-gradient(180deg, var(--section-card) 0%, transparent var(--blend-height-sm)),
+    var(--section-pricing);
+}
+
+.home-page > .ip-scope-section {
+  --blend-prev: var(--section-pricing);
+  --blend-next: var(--section-booking-top);
+  border-radius: 0;
+  padding-top: 48px;
+  padding-bottom: 52px;
+  background:
+    linear-gradient(180deg, var(--section-pricing) 0%, transparent var(--blend-height-sm)),
+    var(--section-scope);
+}
+
+.home-page > .asr-booking-section {
+  --blend-prev: var(--section-scope);
+  --blend-next: var(--section-footer);
+  border-radius: 0;
+  margin: 0;
+}
+
+/* Contact ----------------------------------------------------------------- */
+
+.contact-clone-page > .cp-hero {
+  --blend-next: var(--section-reach);
+  position: relative;
+  isolation: isolate;
+  padding-bottom: calc(100px + var(--blend-height-sm));
+}
+
+.contact-clone-page > .cp-hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-reach) 0%,
+    color-mix(in srgb, var(--section-reach) 50%, transparent) 45%,
+    transparent 100%
+  );
+}
+
+.contact-clone-page > .cp-reach {
+  --blend-prev: var(--section-contact-dark);
+  --blend-next: var(--section-contact-dark);
+  position: relative;
+  isolation: isolate;
+  padding-top: calc(72px + 12px);
+  padding-bottom: calc(80px + 12px);
+  background:
+    linear-gradient(180deg, var(--section-contact-dark) 0%, transparent var(--blend-height)),
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgb(12 104 60 / 0.08), transparent 55%),
+    radial-gradient(circle at 90% 80%, rgb(96 165 250 / 0.06), transparent 40%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
+}
+
+.contact-clone-page > .cp-reach::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-contact-dark) 0%,
+    color-mix(in srgb, var(--section-contact-dark) 45%, transparent) 48%,
+    transparent 100%
+  );
+}
+
+.contact-clone-page > .cp-office {
+  --blend-next: var(--section-cta);
+  position: relative;
+  isolation: isolate;
+  /* Soften the former hard 38% dark→light split */
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -8%, rgb(12 104 60 / 0.1), transparent 58%),
+    radial-gradient(circle at 12% 88%, rgb(96 165 250 / 0.05), transparent 42%),
+    linear-gradient(
+      180deg,
+      #0b1a13 0%,
+      #0f2419 28%,
+      color-mix(in srgb, #0f2419 55%, #f8fafc) 42%,
+      #f8fafc 58%,
+      #eef2f6 100%
+    );
+}
+
+.contact-clone-page > .cp-office::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height-sm);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-cta) 0%,
+    color-mix(in srgb, var(--section-cta) 50%, transparent) 50%,
+    transparent 100%
+  );
+}
+
+.contact-clone-page > .cp-cta {
+  --blend-prev: var(--section-contact-light);
+  --blend-next: var(--section-booking-top);
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, #eef2f6 0%, transparent var(--blend-height-sm)),
+    #ffffff;
+  padding-top: 68px;
+  padding-bottom: 72px;
+}
+
+.contact-clone-page > .cp-cta::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-booking-top) 0%,
+    color-mix(in srgb, var(--section-booking-top) 50%, transparent) 45%,
+    transparent 100%
+  );
+}
+
+.contact-clone-page > .asr-booking-section {
+  --blend-prev: var(--section-cta);
+  --blend-next: var(--section-footer);
+  border-radius: 0;
+  margin: 0;
+  background:
+    linear-gradient(180deg, var(--section-cta) 0%, transparent var(--blend-height-sm)),
+    radial-gradient(ellipse 90% 70% at 50% -20%, rgb(74 222 128 / 0.22), transparent 55%),
+    radial-gradient(circle at 88% 92%, rgb(255 255 255 / 0.06), transparent 38%),
+    linear-gradient(180deg, #0c683c 0%, #084c2b 100%);
+}
+
+.contact-clone-page > .asr-booking-section::after,
+.home-page > .asr-booking-section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--blend-height);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    0deg,
+    var(--section-footer) 0%,
+    color-mix(in srgb, var(--section-footer) 55%, transparent) 48%,
+    transparent 100%
+  );
+}
+
+.home-page > .asr-booking-section {
+  background:
+    linear-gradient(180deg, var(--section-scope) 0%, transparent var(--blend-height-sm)),
+    radial-gradient(ellipse 90% 70% at 50% -20%, rgb(74 222 128 / 0.22), transparent 55%),
+    radial-gradient(circle at 88% 92%, rgb(255 255 255 / 0.06), transparent 38%),
+    linear-gradient(180deg, #0c683c 0%, #084c2b 100%);
+}
+
+/* Reviews page — soft tonal steps within dark green --------------------------- */
+
+.reviews-clone-page > .wp-review-header-section {
+  --blend-next: var(--section-reviews);
+  position: relative;
+  isolation: isolate;
+  background-image:
+    linear-gradient(180deg, transparent 60%, var(--section-reviews) 100%),
+    linear-gradient(189deg, #0a2012 55%, #0c2717 63%);
+}
+
+.reviews-clone-page > .featured-section {
+  --blend-next: var(--section-reviews);
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, #0a2012 0%, transparent 48px),
+    var(--section-reviews);
+}
+
+.reviews-clone-page > .wp-stories-section {
+  --blend-next: #0c2617;
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #0c2617 40%, var(--section-reviews)) 0%, var(--section-reviews) 40%),
+    var(--section-reviews);
+}
+
+.reviews-clone-page > .wp-cta-green-section {
+  --blend-prev: var(--section-reviews);
+  --blend-next: transparent;
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, var(--section-reviews) 0%, transparent 56px),
+    #0c2617;
+}
+
+/* Footer soft entry ------------------------------------------------------- */
+
+.landing-route .site-footer,
+.contact-route .site-footer,
+.app-frame:not(.reviews-route):not(.landing-route):not(.contact-route) .site-footer {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-route .site-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--blend-height-sm);
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    var(--section-card) 0%,
+    color-mix(in srgb, var(--section-card) 35%, transparent) 50%,
+    transparent 100%
+  );
+}
+
+.contact-route .site-footer::before,
+.app-frame:not(.reviews-route):not(.landing-route):not(.contact-route) .site-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--blend-height-sm);
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    var(--section-booking-bottom) 0%,
+    color-mix(in srgb, var(--section-booking-bottom) 40%, transparent) 55%,
+    transparent 100%
+  );
+}
+
+.site-footer > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soft junction glow (no hard divider line) -------------------------------- */
+
+.landing-page > .reviews-section,
+.landing-page > .ip-pricing-section,
+.landing-page > .ip-scope-section,
+.landing-page > .landing-gallery-section,
+.home-page > .feature-section,
+.home-page > .products-section,
+.home-page > .ip-pricing-section,
+.contact-clone-page > .cp-reach,
+.contact-clone-page > .cp-office {
+  box-shadow: none;
+}
+
+/* Mobile tweaks ----------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  :root {
+    --blend-height: clamp(44px, 12vw, 80px);
+    --blend-height-sm: clamp(32px, 9vw, 56px);
+  }
+
+  .landing-demos-section,
+  .landing-gallery-section,
+  .landing-page > .landing-faq-section,
+  .home-page > .feature-section,
+  .home-page > .products-section {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .contact-clone-page > .cp-office {
+    background:
+      radial-gradient(ellipse 90% 40% at 50% 0%, rgb(12 104 60 / 0.1), transparent 55%),
+      linear-gradient(
+        180deg,
+        #0b1a13 0%,
+        #0f2419 26%,
+        color-mix(in srgb, #0f2419 50%, #f8fafc) 40%,
+        #f8fafc 56%,
+        #eef2f6 100%
+      );
+  }
+}
+
+/* Prefer-reduced-motion: keep blends but avoid heavy paint feel ----------- */
+@media (prefers-reduced-motion: reduce) {
+  .section-blend::before,
+  .section-blend::after,
+  .section-blend-bottom::after,
+  .landing-intro-hero::after,
+  .home-page > .hero-banner-section::after,
+  .contact-clone-page > .cp-hero::after,
+  .contact-clone-page > .cp-reach::after,
+  .contact-clone-page > .cp-office::after,
+  .contact-clone-page > .cp-cta::after,
+  .contact-clone-page > .asr-booking-section::after,
+  .home-page > .asr-booking-section::after,
+  .reviews-clone-page > section::after,
+  .site-footer::before {
+    transition: none;
+  }
+}
