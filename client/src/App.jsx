@@ -470,14 +470,11 @@ const getPlayableVideoUrl = (url, { autoplay = true, muted = false } = {}) => {
     return trimmed
   }
 
-  // Mobile Safari/Chrome only allow autoplay when muted.
-  const forceMute = Boolean(autoplay) || Boolean(muted)
-
   const youtubeId = extractYoutubeId(trimmed)
   if (youtubeId) {
     const params = new URLSearchParams({
       autoplay: autoplay ? '1' : '0',
-      mute: forceMute ? '1' : '0',
+      mute: muted ? '1' : '0',
       playsinline: '1',
       rel: '0',
       controls: '1',
@@ -486,14 +483,18 @@ const getPlayableVideoUrl = (url, { autoplay = true, muted = false } = {}) => {
       fs: '1',
     })
 
-    return `https://www.youtube-nocookie.com/embed/${youtubeId}?${params.toString()}`
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      params.set('origin', window.location.origin)
+    }
+
+    return `https://www.youtube.com/embed/${youtubeId}?${params.toString()}`
   }
 
   if (/youtube(?:-nocookie)?\.com\/embed\//i.test(trimmed)) {
     try {
       const parsed = new URL(trimmed)
       parsed.searchParams.set('autoplay', autoplay ? '1' : '0')
-      parsed.searchParams.set('mute', forceMute ? '1' : '0')
+      parsed.searchParams.set('mute', muted ? '1' : '0')
       parsed.searchParams.set('playsinline', '1')
       parsed.searchParams.set('rel', '0')
       parsed.searchParams.set('controls', '1')
@@ -501,11 +502,19 @@ const getPlayableVideoUrl = (url, { autoplay = true, muted = false } = {}) => {
       return parsed.toString()
     } catch {
       const separator = trimmed.includes('?') ? '&' : '?'
-      return `${trimmed}${separator}autoplay=${autoplay ? '1' : '0'}&mute=${forceMute ? '1' : '0'}&playsinline=1&rel=0&controls=1`
+      return `${trimmed}${separator}autoplay=${autoplay ? '1' : '0'}&mute=${muted ? '1' : '0'}&playsinline=1&rel=0&controls=1&enablejsapi=1`
     }
   }
 
   return trimmed
+}
+
+const postYoutubeCommand = (iframe, func, args = []) => {
+  if (!iframe?.contentWindow) return
+  iframe.contentWindow.postMessage(
+    JSON.stringify({ event: 'command', func, args }),
+    '*',
+  )
 }
 
 const VIDEO_PLAY_EVENT = 'iot-exclusive-video-play'

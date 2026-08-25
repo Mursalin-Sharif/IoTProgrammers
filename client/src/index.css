@@ -804,6 +804,27 @@ body.contact-route-body {
   max-height: 72vh;
 }
 
+.landing-video-play-btn {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 0;
+  background: rgba(6, 16, 31, 0.45);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.landing-video-play-btn:hover,
+.landing-video-play-btn:focus-visible {
+  background: rgba(6, 16, 31, 0.58);
+}
+
 .landing-video-placeholder {
   display: grid;
   place-items: center;
