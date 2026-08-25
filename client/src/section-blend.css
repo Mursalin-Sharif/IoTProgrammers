@@ -11,6 +11,8 @@
   --section-pricing: #f8fafc;
   --section-scope: #f0fdfa;
   --section-cream: #faf8f3;
+  --section-home: #edf2f7;
+  --section-home-card: #edf5ff;
   --section-hero-green: #0a2e1a;
   --section-contact-dark: #0b1a13;
   --section-contact-light: #eef2f5;
@@ -250,7 +252,7 @@
 
 .home-page > .feature-section {
   --blend-prev: var(--section-hero-green);
-  --blend-next: var(--section-card);
+  --blend-next: var(--section-home);
   width: 100%;
   max-width: none;
   margin: 0;
@@ -283,7 +285,7 @@
   background:
     linear-gradient(180deg, var(--section-cream) 0%, transparent var(--blend-height-sm)),
     radial-gradient(ellipse 70% 50% at 50% 0%, rgb(28 199 184 / 0.07), transparent 55%),
-    var(--section-card);
+    var(--section-home);
 }
 
 .home-page > .products-section .products-offer-bar,
@@ -294,13 +296,13 @@
 }
 
 .home-page > .ip-pricing-section {
-  --blend-prev: var(--section-card);
+  --blend-prev: var(--section-home);
   --blend-next: var(--section-scope);
   border-radius: 0;
   padding-top: 56px;
   padding-bottom: 52px;
   background:
-    linear-gradient(180deg, var(--section-card) 0%, transparent var(--blend-height-sm)),
+    linear-gradient(180deg, var(--section-home) 0%, transparent var(--blend-height-sm)),
     var(--section-pricing);
 }
 

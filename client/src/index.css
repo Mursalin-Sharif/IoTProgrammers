@@ -93,8 +93,9 @@ body.home-route-body,
 .home-route,
 .home-route .app-frame,
 .home-route .app-shell,
-.home-route .page-shell {
-  background: #edf2f7;
+.home-route .page-shell,
+.home-page {
+  background: #edf2f7 !important;
 }
 
 body.landing-route-body,
@@ -108,7 +109,6 @@ body.landing-route-body,
   max-width: none;
   gap: 0;
   justify-items: stretch;
-  background: #edf2f7;
 }
 
 .home-page > section,
@@ -122,6 +122,10 @@ body.landing-route-body,
   border-radius: 0;
   border: 0;
   box-shadow: none;
+}
+
+.home-page .product-card {
+  background: #edf5ff;
 }
 
 .admin-section,
