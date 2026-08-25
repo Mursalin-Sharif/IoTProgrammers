@@ -470,29 +470,39 @@ const getPlayableVideoUrl = (url, { autoplay = true, muted = false } = {}) => {
     return trimmed
   }
 
+  // Mobile Safari/Chrome only allow autoplay when muted.
+  const forceMute = Boolean(autoplay) || Boolean(muted)
+
   const youtubeId = extractYoutubeId(trimmed)
   if (youtubeId) {
     const params = new URLSearchParams({
       autoplay: autoplay ? '1' : '0',
-      mute: muted ? '1' : '0',
+      mute: forceMute ? '1' : '0',
       playsinline: '1',
       rel: '0',
       controls: '1',
       modestbranding: '1',
+      enablejsapi: '1',
+      fs: '1',
     })
 
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      params.set('origin', window.location.origin)
-    }
-
-    return `https://www.youtube.com/embed/${youtubeId}?${params.toString()}`
+    return `https://www.youtube-nocookie.com/embed/${youtubeId}?${params.toString()}`
   }
 
-  if (/youtube\.com\/embed\//i.test(trimmed)) {
-    const separator = trimmed.includes('?') ? '&' : '?'
-    return autoplay
-      ? `${trimmed}${separator}autoplay=1&mute=${muted ? '1' : '0'}&playsinline=1&rel=0&controls=1`
-      : trimmed
+  if (/youtube(?:-nocookie)?\.com\/embed\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed)
+      parsed.searchParams.set('autoplay', autoplay ? '1' : '0')
+      parsed.searchParams.set('mute', forceMute ? '1' : '0')
+      parsed.searchParams.set('playsinline', '1')
+      parsed.searchParams.set('rel', '0')
+      parsed.searchParams.set('controls', '1')
+      parsed.searchParams.set('enablejsapi', '1')
+      return parsed.toString()
+    } catch {
+      const separator = trimmed.includes('?') ? '&' : '?'
+      return `${trimmed}${separator}autoplay=${autoplay ? '1' : '0'}&mute=${forceMute ? '1' : '0'}&playsinline=1&rel=0&controls=1`
+    }
   }
 
   return trimmed
@@ -1030,14 +1040,14 @@ function SiteFooter({ content }) {
 
 function LandingIntroSection({ content }) {
   const rootRef = useRef(null)
+  const wrapRef = useRef(null)
   const playerId = useId()
   const videoRef = useRef(null)
   const [introActive, setIntroActive] = useState(true)
+  const [inView, setInView] = useState(false)
+  const [iframeSrc, setIframeSrc] = useState('')
+  const [playNonce, setPlayNonce] = useState(0)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
-  // Mobile browsers block unmuted autoplay — mute is required for real-device autoplay.
-  const landingVideoSrc = introVideoUrl
-    ? getPlayableVideoUrl(introVideoUrl, { autoplay: introActive, muted: true })
-    : ''
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText])
@@ -1045,37 +1055,87 @@ function LandingIntroSection({ content }) {
   useExclusiveVideo(playerId, () => {
     setIntroActive(false)
     videoRef.current?.pause()
+    setIframeSrc('')
   })
 
+  // Start muted autoplay only once the hero is on screen (more reliable on real phones).
   useEffect(() => {
-    if (!isFileVideo || !videoRef.current || !introActive) return undefined
+    const node = wrapRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setInView(true)
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
+            setInView(true)
+          }
+        })
+      },
+      { threshold: [0.25, 0.5], rootMargin: '40px 0px' },
+    )
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [introVideoUrl])
+
+  useEffect(() => {
+    if (!introVideoUrl || isFileVideo || !introActive || !inView) {
+      if (!introActive) setIframeSrc('')
+      return undefined
+    }
+
+    const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
+    // Delay assign so mobile browsers treat this as a fresh media load.
+    const timer = window.setTimeout(() => {
+      setIframeSrc(src)
+      setPlayNonce((value) => value + 1)
+      requestExclusiveVideoPlay(playerId)
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [introVideoUrl, isFileVideo, introActive, inView, playerId])
+
+  useEffect(() => {
+    if (!isFileVideo || !videoRef.current || !introActive || !inView) return undefined
 
     const video = videoRef.current
     video.muted = true
     video.defaultMuted = true
     video.setAttribute('muted', '')
+    video.setAttribute('playsinline', '')
+    video.setAttribute('webkit-playsinline', '')
     video.playsInline = true
     const playPromise = video.play()
-    playPromise?.catch?.(() => {})
+    playPromise?.catch?.(() => {
+      // If autoplay is still blocked, keep muted and retry once on next frame.
+      window.requestAnimationFrame(() => {
+        video.muted = true
+        video.play()?.catch?.(() => {})
+      })
+    })
 
     return undefined
-  }, [isFileVideo, landingVideoSrc, introActive])
+  }, [isFileVideo, introVideoUrl, introActive, inView])
 
   const resumeIntro = () => {
     setIntroActive(true)
+    setInView(true)
     requestExclusiveVideoPlay(playerId)
   }
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
-      <div className="landing-video-wrap" onClick={resumeIntro}>
-        {landingVideoSrc ? (
+      <div ref={wrapRef} className="landing-video-wrap" onClick={resumeIntro}>
+        {introVideoUrl ? (
           isFileVideo ? (
             <video
               ref={videoRef}
               className="landing-video-player"
               src={introVideoUrl}
-              autoPlay={introActive}
+              autoPlay={introActive && inView}
               muted
               loop
               playsInline
@@ -1083,14 +1143,21 @@ function LandingIntroSection({ content }) {
               preload="auto"
               onPlay={resumeIntro}
             />
-          ) : (
+          ) : iframeSrc ? (
             <iframe
-              key={introActive ? 'intro-on-muted' : 'intro-off'}
-              src={landingVideoSrc}
+              key={`intro-${playNonce}`}
+              className="landing-video-frame"
+              src={iframeSrc}
               title="Landing intro video"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
+              loading="eager"
+              referrerPolicy="strict-origin-when-cross-origin"
             />
+          ) : (
+            <div className="landing-video-placeholder">
+              <p>Loading video…</p>
+            </div>
           )
         ) : (
           <div className="landing-video-placeholder">
