@@ -81,10 +81,47 @@ iframe {
 }
 
 .app-shell {
-  width: min(1280px, calc(100% - 24px));
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding-top: 3.75rem;
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Full-bleed page backgrounds (no side gutters) */
+body.home-route-body,
+.home-route,
+.home-route .app-frame,
+.home-route .app-shell,
+.home-route .page-shell {
+  background: #edf2f7;
+}
+
+body.landing-route-body,
+.landing-route,
+.landing-route .app-frame {
+  background: #081120;
+}
+
+.home-page {
+  width: 100%;
+  max-width: none;
+  gap: 0;
+  justify-items: stretch;
+  background: #edf2f7;
+}
+
+.home-page > section,
+.home-page > .asr-booking-section,
+.home-page > .ip-pricing-section,
+.home-page > .ip-scope-section {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .admin-section,
@@ -913,10 +950,10 @@ body.contact-route-body {
 
 .hero-banner-section {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   overflow: hidden;
   background: #0a2e1a;
 }
@@ -1061,11 +1098,12 @@ body.contact-route-body {
 }
 
 .feature-section {
-  width: min(1152px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 28px 16px 18px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 28px clamp(12px, 3vw, 24px) 18px;
   background: #faf8f3;
-  border-radius: 24px;
+  border-radius: 0;
 }
 
 .feature-carousel-shell {
@@ -1075,6 +1113,8 @@ body.contact-route-body {
   align-items: center;
   gap: 8px;
   padding: 0 4px;
+  width: min(1152px, 100%);
+  margin: 0 auto;
 }
 
 .feature-grid {
@@ -1220,9 +1260,19 @@ body.contact-route-body {
 }
 
 .products-section {
-  width: min(1152px, calc(100% - 24px));
-  margin: 0 auto;
-  padding: 16px 0 8px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 16px clamp(12px, 3vw, 24px) 24px;
+  background: #edf2f7;
+}
+
+.products-section .products-offer-bar,
+.products-section .demo-grid,
+.products-section .products-empty {
+  width: min(1152px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .products-offer-bar {

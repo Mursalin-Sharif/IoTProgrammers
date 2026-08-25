@@ -703,17 +703,22 @@ function App() {
 function SiteLayout({ content, loading, error }) {
   const location = useLocation()
   const isLanding = location.pathname === '/landing'
+  const isHome = location.pathname === '/' || location.pathname === '/home'
   const isReviews = location.pathname === '/reviews'
   const isContact = location.pathname === '/contact'
 
   useEffect(() => {
+    document.body.classList.toggle('home-route-body', isHome)
     document.body.classList.toggle('reviews-route-body', isReviews)
     document.body.classList.toggle('contact-route-body', isContact)
+    document.body.classList.toggle('landing-route-body', isLanding)
     return () => {
+      document.body.classList.remove('home-route-body')
       document.body.classList.remove('reviews-route-body')
       document.body.classList.remove('contact-route-body')
+      document.body.classList.remove('landing-route-body')
     }
-  }, [isReviews, isContact])
+  }, [isHome, isReviews, isContact, isLanding])
 
   useEffect(() => {
     scrollToTop()
@@ -724,11 +729,15 @@ function SiteLayout({ content, loading, error }) {
   }, [location.pathname])
 
   return (
-    <div className={`app-frame${isLanding ? ' landing-route' : ''}${isReviews ? ' reviews-route' : ''}${isContact ? ' contact-route' : ''}`}>
+    <div
+      className={`app-frame${isHome ? ' home-route' : ''}${isLanding ? ' landing-route' : ''}${isReviews ? ' reviews-route' : ''}${isContact ? ' contact-route' : ''}`}
+    >
       <GtmSnippets siteSettings={content.siteSettings} />
       <SiteHeader content={content} variant="dark" />
       {isLanding && <LandingIntroSection content={content} />}
-      <div className={`app-shell${isLanding ? ' landing-shell' : ''}${isReviews ? ' reviews-shell' : ''}${isContact ? ' contact-shell' : ''}`}>
+      <div
+        className={`app-shell${isHome ? ' home-shell' : ''}${isLanding ? ' landing-shell' : ''}${isReviews ? ' reviews-shell' : ''}${isContact ? ' contact-shell' : ''}`}
+      >
         {loading && <div className="status-banner">{siteChrome.loading}</div>}
         {error && (
           <div className="status-banner warning">
