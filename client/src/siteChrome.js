@@ -2,19 +2,19 @@ import { Globe, Home, Mail, Star } from 'lucide-react'
 
 /** Fixed English nav / chrome labels (header, footer, bottom nav). */
 export const navItems = [
-  { to: '/', label: 'Landing', icon: Globe },
-  { to: '/home', label: 'Home', icon: Home },
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/landing', label: 'Landing', icon: Globe },
   { to: '/reviews', label: 'Reviews', icon: Star },
   { to: '/contact', label: 'Contact', icon: Mail },
 ]
 
 export const bottomNavSideItems = [
-  { to: '/', label: 'Landing', icon: Globe, end: true },
+  { to: '/landing', label: 'Landing', icon: Globe },
   { to: '/reviews', label: 'Reviews', icon: Star },
   { to: '/contact', label: 'Contact', icon: Mail },
 ]
 
-export const bottomNavHomeItem = { to: '/home', label: 'Home', icon: Home }
+export const bottomNavHomeItem = { to: '/', label: 'Home', icon: Home }
 
 export const siteChrome = {
   linksHeading: 'Links',

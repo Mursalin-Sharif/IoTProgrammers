@@ -1,7 +1,7 @@
 const homeDefaults = {
   featureFooterText: 'WhatsApp 01302003306',
   productsOfferText: 'View current offers',
-  productsOfferLink: '/home',
+  productsOfferLink: '/',
   heroSlides: [
     {
       badge: 'IoTProgrammers',
@@ -17,7 +17,7 @@ const homeDefaults = {
       title: 'Launch Your Business Website Faster',
       subtitle: 'Carousel banners · Demo cards · Reviews · Full admin dashboard',
       ctaText: 'View Demos',
-      ctaLink: '/home',
+      ctaLink: '/',
       imageUrl:
         'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&q=80',
     },

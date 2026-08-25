@@ -692,7 +692,7 @@ function App() {
 
 function SiteLayout({ content, loading, error }) {
   const location = useLocation()
-  const isLanding = location.pathname === '/'
+  const isLanding = location.pathname === '/landing'
   const isReviews = location.pathname === '/reviews'
   const isContact = location.pathname === '/contact'
 
@@ -727,8 +727,9 @@ function SiteLayout({ content, loading, error }) {
         )}
         <main className={`page-shell${isReviews ? ' reviews-page-shell' : ''}${isContact ? ' contact-page-shell' : ''}`}>
           <Routes>
-            <Route path="/" element={<LandingPage content={content} />} />
+            <Route path="/" element={<HomePage content={content} />} />
             <Route path="/home" element={<HomePage content={content} />} />
+            <Route path="/landing" element={<LandingPage content={content} />} />
             <Route path="/reviews" element={<ReviewsPage content={content} />} />
             <Route path="/contact" element={<ContactPage content={content} />} />
             <Route path="/privacy-policy" element={<SimpleTextPage slug="privacy-policy" />} />
@@ -962,8 +963,8 @@ function SiteFooter({ content }) {
           <div className="site-footer-col">
             <h4 className="site-footer-heading">{siteChrome.linksHeading}</h4>
             <nav className="site-footer-list" aria-label={siteChrome.footerLinksAria}>
-              <NavLink to="/home">{siteChrome.home}</NavLink>
-              <NavLink to="/">{siteChrome.landing}</NavLink>
+              <NavLink to="/">{siteChrome.home}</NavLink>
+              <NavLink to="/landing">{siteChrome.landing}</NavLink>
               <NavLink to="/reviews">{siteChrome.reviews}</NavLink>
               <NavLink to="/contact">{siteChrome.contact}</NavLink>
               {settings.facebookUrl && (
