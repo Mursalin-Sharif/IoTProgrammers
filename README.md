@@ -52,9 +52,10 @@ git push -u origin main
 Do **not** commit `server/.env` or `node_modules`.
 
 ### Hostinger Node version
-This project builds on **Node 18.18+** (Hostinger default `v18.20.x` is OK).
+**Required: Node.js 20.19+** (or 22 LTS).
 
-If the panel allows Node 20, you can use that too — not required after the Node-18-compatible dependency pin.
+Hostinger panel → Node.js app → set Node version to **20** (not 18).  
+Node 18 will fail on Vite 8 (`styleText` / engine errors).
 
 ```env
 PORT=3000
