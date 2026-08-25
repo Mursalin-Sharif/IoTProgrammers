@@ -1034,8 +1034,9 @@ function LandingIntroSection({ content }) {
   const videoRef = useRef(null)
   const [introActive, setIntroActive] = useState(true)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
+  // Mobile browsers block unmuted autoplay — mute is required for real-device autoplay.
   const landingVideoSrc = introVideoUrl
-    ? getPlayableVideoUrl(introVideoUrl, { autoplay: introActive, muted: false })
+    ? getPlayableVideoUrl(introVideoUrl, { autoplay: introActive, muted: true })
     : ''
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
 
@@ -1050,8 +1051,10 @@ function LandingIntroSection({ content }) {
     if (!isFileVideo || !videoRef.current || !introActive) return undefined
 
     const video = videoRef.current
-    video.muted = false
-    video.volume = 1
+    video.muted = true
+    video.defaultMuted = true
+    video.setAttribute('muted', '')
+    video.playsInline = true
     const playPromise = video.play()
     playPromise?.catch?.(() => {})
 
@@ -1073,6 +1076,7 @@ function LandingIntroSection({ content }) {
               className="landing-video-player"
               src={introVideoUrl}
               autoPlay={introActive}
+              muted
               loop
               playsInline
               controls
@@ -1081,7 +1085,7 @@ function LandingIntroSection({ content }) {
             />
           ) : (
             <iframe
-              key={introActive ? 'intro-on' : 'intro-off'}
+              key={introActive ? 'intro-on-muted' : 'intro-off'}
               src={landingVideoSrc}
               title="Landing intro video"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
