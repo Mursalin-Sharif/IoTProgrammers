@@ -1059,12 +1059,14 @@ function SiteFooter({ content }) {
 function LandingIntroSection({ content }) {
   const rootRef = useRef(null)
   const wrapRef = useRef(null)
+  const iframeRef = useRef(null)
   const playerId = useId()
   const videoRef = useRef(null)
   const [introActive, setIntroActive] = useState(true)
   const [inView, setInView] = useState(false)
   const [iframeSrc, setIframeSrc] = useState('')
   const [playNonce, setPlayNonce] = useState(0)
+  const [needsTap, setNeedsTap] = useState(false)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
 
@@ -1076,7 +1078,6 @@ function LandingIntroSection({ content }) {
     setIframeSrc('')
   })
 
-  // Start muted autoplay only once the hero is on screen (more reliable on real phones).
   useEffect(() => {
     const node = wrapRef.current
     if (!node || typeof IntersectionObserver === 'undefined') {
@@ -1105,78 +1106,98 @@ function LandingIntroSection({ content }) {
       return undefined
     }
 
-    const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
-    // Delay assign so mobile browsers treat this as a fresh media load.
+    const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
     const timer = window.setTimeout(() => {
-      setIframeSrc(src)
+      setIframeSrc(withSound)
       setPlayNonce((value) => value + 1)
+      setNeedsTap(false)
       requestExclusiveVideoPlay(playerId)
-    }, 120)
+    }, 80)
 
-    return () => window.clearTimeout(timer)
+    const fallback = window.setTimeout(() => setNeedsTap(true), 1600)
+
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(fallback)
+    }
   }, [introVideoUrl, isFileVideo, introActive, inView, playerId])
 
   useEffect(() => {
     if (!isFileVideo || !videoRef.current || !introActive || !inView) return undefined
 
     const video = videoRef.current
-    video.muted = true
-    video.defaultMuted = true
-    video.setAttribute('muted', '')
-    video.setAttribute('playsinline', '')
-    video.setAttribute('webkit-playsinline', '')
+    video.muted = false
+    video.volume = 1
     video.playsInline = true
-    const playPromise = video.play()
-    playPromise?.catch?.(() => {
-      // If autoplay is still blocked, keep muted and retry once on next frame.
-      window.requestAnimationFrame(() => {
-        video.muted = true
-        video.play()?.catch?.(() => {})
-      })
-    })
+    video.play()?.catch?.(() => setNeedsTap(true))
 
     return undefined
   }, [isFileVideo, introVideoUrl, introActive, inView])
 
-  const resumeIntro = () => {
+  const playWithSound = () => {
+    setNeedsTap(false)
     setIntroActive(true)
     setInView(true)
     requestExclusiveVideoPlay(playerId)
+
+    if (isFileVideo && videoRef.current) {
+      videoRef.current.muted = false
+      videoRef.current.volume = 1
+      videoRef.current.play()?.catch?.(() => {})
+      return
+    }
+
+    if (!introVideoUrl) return
+    const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
+    setIframeSrc(withSound)
+    setPlayNonce((value) => value + 1)
+    window.setTimeout(() => {
+      postYoutubeCommand(iframeRef.current, 'unMute')
+      postYoutubeCommand(iframeRef.current, 'playVideo')
+      postYoutubeCommand(iframeRef.current, 'setVolume', [100])
+    }, 350)
   }
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
-      <div ref={wrapRef} className="landing-video-wrap" onClick={resumeIntro}>
+      <div ref={wrapRef} className="landing-video-wrap">
         {introVideoUrl ? (
-          isFileVideo ? (
-            <video
-              ref={videoRef}
-              className="landing-video-player"
-              src={introVideoUrl}
-              autoPlay={introActive && inView}
-              muted
-              loop
-              playsInline
-              controls
-              preload="auto"
-              onPlay={resumeIntro}
-            />
-          ) : iframeSrc ? (
-            <iframe
-              key={`intro-${playNonce}`}
-              className="landing-video-frame"
-              src={iframeSrc}
-              title="Landing intro video"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              loading="eager"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : (
-            <div className="landing-video-placeholder">
-              <p>Loading video…</p>
-            </div>
-          )
+          <>
+            {isFileVideo ? (
+              <video
+                ref={videoRef}
+                className="landing-video-player"
+                src={introVideoUrl}
+                autoPlay={introActive && inView}
+                loop
+                playsInline
+                controls
+                preload="auto"
+                onPlay={() => setNeedsTap(false)}
+              />
+            ) : iframeSrc ? (
+              <iframe
+                key={`intro-${playNonce}`}
+                ref={iframeRef}
+                className="landing-video-frame"
+                src={iframeSrc}
+                title="Landing intro video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                loading="eager"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : (
+              <div className="landing-video-placeholder">
+                <p>Loading video…</p>
+              </div>
+            )}
+            {needsTap ? (
+              <button type="button" className="landing-video-play-btn" onClick={playWithSound}>
+                Play with sound
+              </button>
+            ) : null}
+          </>
         ) : (
           <div className="landing-video-placeholder">
             <p>অ্যাডমিন থেকে ল্যান্ডিং ইন্ট্রো ভিডিও যোগ করুন।</p>
