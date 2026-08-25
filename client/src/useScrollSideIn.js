@@ -10,6 +10,7 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 /**
  * Side-in scroll reveals for elements with data-animate="left|right".
  * Reverses on scroll-up via toggleActions. Skips Swiper nodes and reduced motion.
+ * On narrow screens use a short slide (not ±100vw) so CSS grids stay intact.
  */
 export function useScrollSideIn(rootRef, deps = []) {
   useEffect(() => {
@@ -26,22 +27,25 @@ export function useScrollSideIn(rootRef, deps = []) {
     if (!targets.length) return undefined
 
     const triggers = []
+    const isNarrow = window.matchMedia('(max-width: 767px)').matches
+    const offset = isNarrow ? 56 : '100vw'
 
     targets.forEach((el) => {
       const side = el.getAttribute('data-animate')
-      const fromX = side === 'right' ? '100vw' : '-100vw'
+      const fromX = side === 'right' ? offset : typeof offset === 'number' ? -offset : `-${offset}`
 
       const tween = gsap.fromTo(
         el,
-        { x: fromX },
+        { x: fromX, autoAlpha: isNarrow ? 0.35 : 1 },
         {
           x: 0,
-          duration: 0.85,
+          autoAlpha: 1,
+          duration: isNarrow ? 0.55 : 0.85,
           ease: 'power3.out',
           overwrite: 'auto',
           scrollTrigger: {
             trigger: el,
-            start: 'top 85%',
+            start: 'top 90%',
             toggleActions: 'play reverse play reverse',
             invalidateOnRefresh: true,
           },
@@ -58,7 +62,7 @@ export function useScrollSideIn(rootRef, deps = []) {
     return () => {
       triggers.forEach((trigger) => trigger.kill())
       gsap.killTweensOf(targets)
-      gsap.set(targets, { clearProps: 'transform' })
+      gsap.set(targets, { clearProps: 'transform,opacity,visibility' })
     }
   }, deps)
 }

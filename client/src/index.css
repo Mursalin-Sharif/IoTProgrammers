@@ -1347,6 +1347,53 @@ body.contact-route-body {
   gap: 14px;
 }
 
+.home-page .products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.home-page .products-grid > .product-card {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-page .products-grid .product-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px 12px;
+}
+
+.home-page .products-grid .product-title {
+  font-size: clamp(0.78rem, 2.8vw, 0.95rem);
+  margin: 0;
+}
+
+.home-page .products-grid .product-credentials {
+  margin: 0;
+  padding: 8px 6px;
+}
+
+.home-page .products-grid .product-credentials p {
+  font-size: clamp(0.68rem, 2.4vw, 0.78rem);
+  gap: 4px;
+}
+
+.home-page .products-grid .product-demo-link {
+  min-height: 36px;
+  font-size: clamp(0.72rem, 2.5vw, 0.82rem);
+  margin-top: auto;
+}
+
+.home-page .products-grid .product-whatsapp-link {
+  margin-top: 0;
+}
+
 .product-card {
   overflow: hidden;
   border-radius: 22px;
@@ -1699,6 +1746,10 @@ button.product-demo-link {
 .home-grid,
 .products-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-page .products-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .landing-grid {
@@ -3190,6 +3241,24 @@ button.product-demo-link {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .home-page .products-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px;
+  }
+
+  .home-page .products-grid .product-body {
+    padding: 14px 14px 16px;
+  }
+
+  .home-page .products-grid .product-title {
+    font-size: 0.98rem;
+  }
+
+  .home-page .products-grid .product-demo-link {
+    min-height: 42px;
+    font-size: 0.92rem;
+  }
+
   .landing-grid,
   .gallery-grid,
   .form-grid {
@@ -3201,6 +3270,10 @@ button.product-demo-link {
   .home-grid,
   .products-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .home-page .products-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
   .landing-grid {

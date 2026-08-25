@@ -1954,15 +1954,14 @@ function HomePage({ content }) {
         )}
 
         <div className="products-grid">
-          {(content.home.demoCards || []).map((card, index) => (
-            <div key={card.id || card._id || card.title} data-animate={sideInAttr(index)}>
-              <DemoCard
-                card={card}
-                variant="product"
-                whatsappNumber={content.siteSettings.whatsappNumber}
-                whatsappFallback={siteChrome.whatsappCta}
-              />
-            </div>
+          {(content.home.demoCards || []).map((card) => (
+            <DemoCard
+              key={card.id || card._id || card.title}
+              card={card}
+              variant="product"
+              whatsappNumber={content.siteSettings.whatsappNumber}
+              whatsappFallback={siteChrome.whatsappCta}
+            />
           ))}
         </div>
       </section>
