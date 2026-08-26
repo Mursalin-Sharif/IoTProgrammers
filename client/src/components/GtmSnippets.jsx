@@ -1,15 +1,22 @@
 import { useEffect, useRef } from 'react'
-import { applyGtmSnippets, ensureDataLayer, pushTrackingConfig } from '../tracking'
+import {
+  applyGtmSnippets,
+  captureMarketingAttribution,
+  ensureDataLayer,
+  pushTrackingConfig,
+} from '../tracking'
 
 /**
  * Dynamically injects Admin-configured GTM head/body snippets.
  * Empty fields → no injection. Changing snippets replaces previous nodes.
+ * Captures Meta ads UTM / fbclid before tags boot so Stape CAPI can attribute.
  */
 export default function GtmSnippets({ siteSettings = {} }) {
   const lastKey = useRef('')
 
   useEffect(() => {
     ensureDataLayer()
+    captureMarketingAttribution()
 
     const head = String(siteSettings.gtmHeadCode || siteSettings.gtmHeadScript || '').trim()
     const body = String(siteSettings.gtmBodyCode || siteSettings.gtmBodyScript || '').trim()

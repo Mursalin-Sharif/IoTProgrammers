@@ -865,7 +865,7 @@ function SiteLayout({ content, loading, error }) {
 
   useEffect(() => {
     trackPageView(location.pathname)
-  }, [location.pathname])
+  }, [location.pathname, location.search])
 
   return (
     <div
@@ -1070,8 +1070,10 @@ function BottomNav() {
 }
 
 function FloatingWhatsapp({ number }) {
+  const location = useLocation()
   const e164 = toWhatsappE164(number || BD_WHATSAPP_E164)
   const href = getWhatsappLink(e164)
+  const onLanding = location.pathname === '/landing'
 
   return (
     <a
@@ -1079,11 +1081,15 @@ function FloatingWhatsapp({ number }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-          aria-label={WHATSAPP_LINK_LABEL}
+      aria-label={WHATSAPP_LINK_LABEL}
       data-wa={e164}
       onClick={(event) => {
         trackContact(
-          { content_name: 'Floating WhatsApp', lead_source: 'floating_whatsapp' },
+          {
+            content_name: onLanding ? 'Landing Floating WhatsApp' : 'Floating WhatsApp',
+            lead_source: onLanding ? 'landing_floating_whatsapp' : 'floating_whatsapp',
+            content_category: onLanding ? 'landing_ads' : 'contact',
+          },
           event.currentTarget,
         )
       }}
@@ -1722,7 +1728,8 @@ function GalleryCard({ item, whatsappNumber, liveDemoLabel = siteChrome.liveDemo
             trackContact(
               {
                 content_name: media.title || 'Gallery WhatsApp',
-                lead_source: 'gallery_whatsapp',
+                lead_source: 'landing_gallery_whatsapp',
+                content_category: 'landing_ads',
               },
               event.currentTarget,
             )
@@ -2875,7 +2882,8 @@ function DemoCard({ card, whatsappNumber, variant = 'landing', whatsappFallback,
     trackContact(
       {
         content_name: media.title || 'Demo WhatsApp',
-        lead_source: variant === 'product' ? 'demo_whatsapp' : 'landing_demo_whatsapp',
+        lead_source: variant === 'product' ? 'landing_demo_whatsapp' : 'demo_whatsapp',
+        content_category: variant === 'product' ? 'landing_ads' : 'contact',
       },
       event.currentTarget,
     )

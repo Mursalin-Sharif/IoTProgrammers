@@ -16,12 +16,15 @@ const GTM_HEAD_ATTR = 'data-iot-gtm-head'
 const GTM_BODY_ATTR = 'data-iot-gtm-body'
 const GTM_ID_RE = /^GTM-[A-Z0-9]+$/i
 const GTM_ID_IN_TEXT_RE = /GTM-[A-Z0-9]+/i
+const MARKETING_STORAGE_KEY = 'iot_marketing_attribution'
+const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id']
 
 let lastPageViewKey = ''
 let lastPageViewAt = 0
 const viewContentSeen = new Set()
 const leadClickGuard = new WeakMap()
 let beginCheckoutFired = false
+let marketingCaptured = false
 
 export function ensureDataLayer() {
   if (typeof window === 'undefined') return []
@@ -37,6 +40,107 @@ export function getCookie(name) {
   return match ? decodeURIComponent(match[1]) : ''
 }
 
+function setCookie(name, value, maxAgeSeconds = 90 * 24 * 60 * 60) {
+  if (typeof document === 'undefined' || !value) return
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`
+}
+
+function readStoredMarketing() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.sessionStorage.getItem(MARKETING_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredMarketing(payload) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(MARKETING_STORAGE_KEY, JSON.stringify(payload))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+/**
+ * Capture UTM + fbclid from the landing URL (Meta ads), persist for the session,
+ * and ensure `_fbc` exists so Stape / CAPI can attribute Contact + Lead.
+ */
+export function captureMarketingAttribution() {
+  if (typeof window === 'undefined') return getMarketingContext()
+
+  const params = new URLSearchParams(window.location.search || '')
+  const stored = readStoredMarketing()
+  const next = { ...stored }
+
+  UTM_KEYS.forEach((key) => {
+    const value = String(params.get(key) || '').trim()
+    if (value) next[key] = value
+  })
+
+  const fbclid = String(params.get('fbclid') || '').trim()
+  if (fbclid) {
+    next.fbclid = fbclid
+    const existingFbc = getCookie('_fbc')
+    if (!existingFbc || !existingFbc.includes(fbclid)) {
+      const fbc = `fb.1.${Date.now()}.${fbclid}`
+      setCookie('_fbc', fbc)
+      next.fbc = fbc
+    } else {
+      next.fbc = existingFbc
+    }
+  } else if (!next.fbc) {
+    const cookieFbc = getCookie('_fbc')
+    if (cookieFbc) next.fbc = cookieFbc
+  }
+
+  const fbp = getCookie('_fbp')
+  if (fbp) next.fbp = fbp
+
+  writeStoredMarketing(next)
+  marketingCaptured = true
+
+  if (!next._pushed) {
+    pushDataLayer({
+      event: 'marketing_attribution',
+      ...next,
+      page_location: window.location.href,
+      page_path: window.location.pathname,
+      page_query: window.location.search || '',
+    })
+    next._pushed = true
+    writeStoredMarketing(next)
+  }
+
+  return getMarketingContext()
+}
+
+export function getMarketingContext() {
+  if (typeof window === 'undefined') return {}
+  if (!marketingCaptured) captureMarketingAttribution()
+
+  const stored = readStoredMarketing()
+  const fbp = getCookie('_fbp') || stored.fbp || undefined
+  const fbc = getCookie('_fbc') || stored.fbc || undefined
+  const context = {
+    page_location: window.location.href,
+    page_path: window.location.pathname,
+    page_query: window.location.search || '',
+    event_source_url: window.location.href,
+  }
+
+  UTM_KEYS.forEach((key) => {
+    if (stored[key]) context[key] = stored[key]
+  })
+  if (stored.fbclid) context.fbclid = stored.fbclid
+  if (fbp) context.fbp = fbp
+  if (fbc) context.fbc = fbc
+
+  return context
+}
+
 /** Unique id per conversion — shared by browser pixel + server CAPI for dedup. */
 export function generateEventId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -49,12 +153,14 @@ export function generateEventId() {
 export const newEventId = generateEventId
 
 function baseEventPayload(extra = {}) {
+  const marketing = getMarketingContext()
   const event_id = extra.event_id || generateEventId()
   const event_time = extra.event_time || Math.round(Date.now() / 1000)
-  const fbp = getCookie('_fbp') || undefined
-  const fbc = getCookie('_fbc') || undefined
+  const fbp = extra.fbp || marketing.fbp || getCookie('_fbp') || undefined
+  const fbc = extra.fbc || marketing.fbc || getCookie('_fbc') || undefined
 
   return {
+    ...marketing,
     ...extra,
     event_id,
     event_time,
@@ -77,6 +183,7 @@ export function pushTrackingConfig({ ga4MeasurementId = '', fbPixelId = '' } = {
   if (!ga4 && !fb) return null
   return pushDataLayer({
     event: 'tracking_config',
+    ...getMarketingContext(),
     ...(ga4 ? { ga4_measurement_id: ga4 } : {}),
     ...(fb ? { fb_pixel_id: fb } : {}),
   })
@@ -85,8 +192,10 @@ export function pushTrackingConfig({ ga4MeasurementId = '', fbPixelId = '' } = {
 /**
  * page_view / PageView — StrictMode-safe (dedupe same path within 800ms).
  * ONE push with event_id for FB PageView + GA4 page_view tags.
+ * Includes UTM / fbclid context for Meta ads → Stape CAPI.
  */
 export function trackPageView(pathname) {
+  captureMarketingAttribution()
   const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '/')
   const now = Date.now()
   if (path === lastPageViewKey && now - lastPageViewAt < 800) {
@@ -100,7 +209,6 @@ export function trackPageView(pathname) {
       event: 'page_view',
       event_name: 'PageView',
       page_path: path,
-      page_location: typeof window !== 'undefined' ? window.location.href : '',
       page_title: typeof document !== 'undefined' ? document.title : '',
     }),
   )

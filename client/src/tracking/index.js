@@ -5,6 +5,8 @@ export {
   newEventId,
   pushDataLayer,
   pushTrackingConfig,
+  captureMarketingAttribution,
+  getMarketingContext,
   trackPageView,
   trackViewContent,
   trackLead,
