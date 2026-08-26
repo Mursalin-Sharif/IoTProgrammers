@@ -5,6 +5,7 @@ export {
   newEventId,
   pushDataLayer,
   pushTrackingConfig,
+  sendGa4ServerHit,
   captureMarketingAttribution,
   getMarketingContext,
   trackPageView,

@@ -18,6 +18,16 @@ const GTM_ID_RE = /^GTM-[A-Z0-9]+$/i
 const GTM_ID_IN_TEXT_RE = /GTM-[A-Z0-9]+/i
 const MARKETING_STORAGE_KEY = 'iot_marketing_attribution'
 const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id']
+const GA4_SERVER_COLLECT = 'https://server.iotprogrammers.com/g/collect'
+const GA4_EVENTS = new Set([
+  'page_view',
+  'view_item',
+  'add_to_cart',
+  'begin_checkout',
+  'purchase',
+  'contact',
+  'generate_lead',
+])
 
 let lastPageViewKey = ''
 let lastPageViewAt = 0
@@ -25,6 +35,7 @@ const viewContentSeen = new Set()
 const leadClickGuard = new WeakMap()
 let beginCheckoutFired = false
 let marketingCaptured = false
+let cachedGa4Id = ''
 
 export function ensureDataLayer() {
   if (typeof window === 'undefined') return []
@@ -170,9 +181,87 @@ function baseEventPayload(extra = {}) {
   }
 }
 
+function readGaClientId() {
+  const raw = getCookie('_ga')
+  const match = String(raw || '').match(/GA\d+\.\d+\.(.+)$/)
+  return match ? match[1] : ''
+}
+
+function readGaSessionId(measurementId) {
+  if (!measurementId) return ''
+  const suffix = String(measurementId).replace(/^G-/, '')
+  const raw = getCookie(`_ga_${suffix}`)
+  // GS2.1.sSESSIONID$... or GS1.1.SESSIONID...
+  const match = String(raw || '').match(/GS\d+\.\d+\.s?(\d+)/)
+  return match ? match[1] : ''
+}
+
+/**
+ * Send GA4 event directly to the Stape/server container.
+ * GTM's GA4 Event tags only reliably fire the first queued page_view in this setup;
+ * this beacon keeps contact / lead / SPA page_view on the server path for CAPI.
+ */
+export function sendGa4ServerHit(eventName, params = {}) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false
+  const tid = String(params.measurement_id || cachedGa4Id || '').trim()
+  const en = String(eventName || '').trim()
+  if (!tid || !en) return false
+
+  const cid = readGaClientId() || `${Date.now()}.${Math.floor(Math.random() * 1e9)}`
+  const sid = readGaSessionId(tid) || String(Math.floor(Date.now() / 1000))
+  const query = new URLSearchParams()
+  query.set('v', '2')
+  query.set('tid', tid)
+  query.set('cid', cid)
+  query.set('en', en)
+  query.set('dl', window.location.href)
+  query.set('dt', document.title || '')
+  query.set('sid', sid)
+  query.set('sct', '1')
+  query.set('seg', '1')
+  query.set('_s', '1')
+  query.set('_p', String(Date.now()))
+  if (params.event_id) query.set('ep.event_id', String(params.event_id))
+  if (params.event_id) query.set('evnid', String(params.event_id))
+  if (params.page_path) query.set('dp', String(params.page_path))
+  if (params.fbp) query.set('ep.x-fb-ck-fbp', String(params.fbp))
+  if (params.fbc) query.set('ep.x-fb-ck-fbc', String(params.fbc))
+  if (params.value != null && params.value !== '') query.set('epn.value', String(Number(params.value)))
+  if (params.currency) query.set('ep.currency', String(params.currency))
+
+  const url = `${GA4_SERVER_COLLECT}?${query.toString()}`
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon(url)
+      return true
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const img = new Image()
+    img.src = url
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function pushDataLayer(payload) {
   const layer = ensureDataLayer()
   layer.push(payload)
+  const eventName = payload && payload.event
+  if (eventName && GA4_EVENTS.has(eventName)) {
+    sendGa4ServerHit(eventName, {
+      measurement_id: cachedGa4Id || payload.ga4_measurement_id,
+      event_id: payload.event_id,
+      page_path: payload.page_path,
+      fbp: payload.fbp,
+      fbc: payload.fbc,
+      value: payload.value,
+      currency: payload.currency,
+    })
+  }
   return payload
 }
 
@@ -180,6 +269,7 @@ export function pushDataLayer(payload) {
 export function pushTrackingConfig({ ga4MeasurementId = '', fbPixelId = '' } = {}) {
   const ga4 = String(ga4MeasurementId || '').trim()
   const fb = String(fbPixelId || '').trim()
+  if (ga4) cachedGa4Id = ga4
   if (!ga4 && !fb) return null
   return pushDataLayer({
     event: 'tracking_config',

@@ -419,10 +419,20 @@ const defaultContent = {
     footerRefundUrl: '/refund-policy',
     contactEmail: 'iotprogrammers@gmail.com',
     contactPhone: '01302003306',
-    gtmHeadCode: '',
-    gtmBodyCode: '',
-    ga4MeasurementId: '',
-    fbPixelId: '',
+    gtmHeadCode: `<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-MT999BBG');</script>
+<!-- End Google Tag Manager -->
+<script>(function(){var GA4='G-ENQ45TKR0E';var SERVER='https://server.iotprogrammers.com/g/collect';var EV={page_view:1,view_item:1,add_to_cart:1,begin_checkout:1,purchase:1,contact:1,generate_lead:1};function cookie(n){var m=document.cookie.match(new RegExp('(?:^|; )'+n.replace(/([.$?*|{}()\\[\\]\\/+^])/g,'\\\\$1')+'=([^;]*)'));return m?decodeURIComponent(m[1]):'';}function cid(){var g=cookie('_ga').match(/GA\\d+\\.\\d+\\.(.+)$/);return g?g[1]:(Date.now()+'.'+Math.floor(Math.random()*1e9));}function sid(){var g=cookie('_ga_ENQ45TKR0E').match(/GS\\d+\\.\\d+\\.s?(\\d+)/);return g?g[1]:String(Math.floor(Date.now()/1000));}function send(en,p){if(!en||!EV[en])return;var q=new URLSearchParams();q.set('v','2');q.set('tid',GA4);q.set('cid',cid());q.set('en',en);q.set('dl',location.href);q.set('dt',document.title||'');q.set('sid',sid());q.set('sct','1');q.set('seg','1');q.set('_s','1');q.set('_p',String(Date.now()));if(p&&p.event_id){q.set('ep.event_id',String(p.event_id));q.set('evnid',String(p.event_id));}if(p&&p.page_path)q.set('dp',String(p.page_path));if(p&&p.fbp)q.set('ep.x-fb-ck-fbp',String(p.fbp));if(p&&p.fbc)q.set('ep.x-fb-ck-fbc',String(p.fbc));var url=SERVER+'?'+q.toString();try{if(navigator.sendBeacon)navigator.sendBeacon(url);else{var i=new Image();i.src=url;}}catch(e){}}var w=window;w.dataLayer=w.dataLayer||[];var _push=w.dataLayer.push.bind(w.dataLayer);w.dataLayer.push=function(){for(var i=0;i<arguments.length;i++){var a=arguments[i];if(a&&typeof a==='object'&&!Array.isArray(a)&&a.event){send(a.event,a);if(a.ga4_measurement_id)GA4=String(a.ga4_measurement_id);}}return _push.apply(null,arguments);};for(var j=0;j<w.dataLayer.length;j++){var e=w.dataLayer[j];if(e&&e.event)send(e.event,e);}})();</script>`,
+    gtmBodyCode: `<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MT999BBG"
+height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->`,
+    ga4MeasurementId: 'G-ENQ45TKR0E',
+    fbPixelId: '5491102457781853',
   },
   home: {
     ...homeDefaults,
@@ -785,25 +795,29 @@ app.get('/api/content', async (_req, res) => {
   res.set('Cache-Control', 'no-store');
 
   if (!isMongoReady) {
-    return res.json({
-      ...memoryContent,
-      siteSettings: {
-        ...defaultContent.siteSettings,
-        ...(memoryContent.siteSettings || {}),
-      },
-    });
+    return res.json(
+      withNormalizedLiveUrls({
+        ...memoryContent,
+        siteSettings: {
+          ...defaultContent.siteSettings,
+          ...(memoryContent.siteSettings || {}),
+        },
+      }),
+    );
   }
 
   const content = await SiteContent.findOne().lean();
   const payload = content || defaultContent;
   // Always expose tracking keys (empty string = no GTM injection on the client).
-  return res.json({
-    ...payload,
-    siteSettings: {
-      ...defaultContent.siteSettings,
-      ...(payload.siteSettings || {}),
-    },
-  });
+  return res.json(
+    withNormalizedLiveUrls({
+      ...payload,
+      siteSettings: {
+        ...defaultContent.siteSettings,
+        ...(payload.siteSettings || {}),
+      },
+    }),
+  );
 });
 
 const omitMongoMeta = (value) => {
@@ -818,6 +832,19 @@ const omitMongoMeta = (value) => {
   return next;
 };
 
+/** Admin often pastes bare domains (dev.iotprogrammers.com) — make them absolute https links. */
+const normalizeLiveDemoUrl = (url) => {
+  const raw = String(url || '').trim();
+  if (!raw || raw === '#') return raw;
+  if (/^(https?:|mailto:|tel:|sms:)/i.test(raw)) return raw;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  if (raw.startsWith('/')) return raw;
+  if (/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}([/:?#].*)?$/i.test(raw)) {
+    return `https://${raw}`;
+  }
+  return raw;
+};
+
 const sanitizeMediaItems = (items = []) =>
   (Array.isArray(items) ? items : []).map((item) => {
     const next = omitMongoMeta(item?.toObject?.() || item);
@@ -828,8 +855,27 @@ const sanitizeMediaItems = (items = []) =>
         : 'image';
     if (!next.status) next.status = 'published';
     if (!next.addedAt) next.addedAt = new Date().toISOString();
+    if (next.liveUrl) next.liveUrl = normalizeLiveDemoUrl(next.liveUrl);
     return next;
   });
+
+const withNormalizedLiveUrls = (payload = {}) => {
+  const next = { ...payload };
+  if (next.home) {
+    next.home = {
+      ...next.home,
+      demoCards: sanitizeMediaItems(next.home.demoCards),
+    };
+  }
+  if (next.landing) {
+    next.landing = {
+      ...next.landing,
+      demoCards: sanitizeMediaItems(next.landing.demoCards),
+      gallery: sanitizeMediaItems(next.landing.gallery),
+    };
+  }
+  return next;
+};
 
 const sanitizeContentPayload = (incoming = {}) => {
   const payload = omitMongoMeta(incoming);

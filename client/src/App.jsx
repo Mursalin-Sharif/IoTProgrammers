@@ -145,6 +145,23 @@ const resolveMediaUrl = (url) => {
   return value
 }
 
+/** Ensure demo/live links open externally even when admin omits https:// */
+const resolveLiveDemoUrl = (url) => {
+  const raw = String(url || '').trim()
+  if (!raw || raw === '#') return ''
+  if (/^(https?:|mailto:|tel:|sms:)/i.test(raw)) return raw
+  if (raw.startsWith('//')) {
+    return `${typeof window !== 'undefined' ? window.location.protocol : 'https:'}${raw}`
+  }
+  // Same-origin path (e.g. /demo) — keep as-is
+  if (raw.startsWith('/')) return raw
+  // Bare domain / host path: "dev.iotprogrammers.com" or "example.com/demo"
+  if (/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}([/:?#].*)?$/i.test(raw)) {
+    return `https://${raw}`
+  }
+  return raw
+}
+
 const withResolvedMedia = (item) => {
   if (!item || typeof item !== 'object') return item
   return {
@@ -152,6 +169,7 @@ const withResolvedMedia = (item) => {
     imageUrl: item.imageUrl ? resolveMediaUrl(item.imageUrl) : item.imageUrl,
     thumbnailUrl: item.thumbnailUrl ? resolveMediaUrl(item.thumbnailUrl) : item.thumbnailUrl,
     videoUrl: item.videoUrl ? resolveMediaUrl(item.videoUrl) : item.videoUrl,
+    liveUrl: item.liveUrl ? resolveLiveDemoUrl(item.liveUrl) : item.liveUrl,
   }
 }
 
@@ -1207,122 +1225,49 @@ function SiteFooter({ content }) {
 
 function LandingIntroSection({ content }) {
   const rootRef = useRef(null)
-  const wrapRef = useRef(null)
-  const iframeRef = useRef(null)
-  const playerId = useId()
-  const videoRef = useRef(null)
-  const startedRef = useRef(false)
-  const [introActive, setIntroActive] = useState(true)
-  const [iframeSrc, setIframeSrc] = useState('')
-  const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
+  const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
+  // One embed URL only — from admin. Muted autoplay avoids reload/unmute glitches.
+  const embedSrc =
+    introVideoUrl && !isFileVideo
+      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
+      : ''
 
-  useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText])
-
-  useExclusiveVideo(playerId, () => {
-    videoRef.current?.pause()
-    stopYoutubePlayer(iframeRef.current)
-    startedRef.current = false
-    setIframeSrc('')
-    setIntroActive(true)
-  })
-
-  // Unmuted autoplay as soon as URL is ready (intro is above the fold).
-  useEffect(() => {
-    if (!introVideoUrl || isFileVideo || !introActive) return undefined
-    if (startedRef.current) return undefined
-
-    const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
-    startedRef.current = true
-    setIframeSrc(src)
-    requestExclusiveVideoPlay(playerId)
-
-    const timer = window.setTimeout(() => {
-      const iframe = iframeRef.current
-      if (!iframe) return
-      iframe.src = src
-      unmuteYoutubePlayerOnce(iframe)
-    }, 50)
-
-    return () => window.clearTimeout(timer)
-  }, [introVideoUrl, isFileVideo, introActive, playerId])
-
-  useEffect(() => {
-    if (!isFileVideo || !videoRef.current || !introActive) return undefined
-
-    const video = videoRef.current
-    video.muted = false
-    video.volume = 1
-    video.playsInline = true
-    video.play()?.catch?.(() => {})
-    return undefined
-  }, [isFileVideo, introVideoUrl, introActive])
-
-  // First user gesture re-arms unmuted play (covers mobile autoplay blocks).
-  useEffect(() => {
-    if (!introVideoUrl || isFileVideo || !iframeSrc) return undefined
-
-    const arm = () => {
-      const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
-      const iframe = iframeRef.current
-      if (iframe) {
-        iframe.src = withSound
-        unmuteYoutubePlayer(iframe)
-      }
-      setIframeSrc(withSound)
-      setIntroActive(true)
-      requestExclusiveVideoPlay(playerId)
-    }
-
-    window.addEventListener('pointerdown', arm, { once: true, capture: true })
-    window.addEventListener('touchstart', arm, { once: true, capture: true })
-    window.addEventListener('keydown', arm, { once: true, capture: true })
-
-    return () => {
-      window.removeEventListener('pointerdown', arm, true)
-      window.removeEventListener('touchstart', arm, true)
-      window.removeEventListener('keydown', arm, true)
-    }
-  }, [introVideoUrl, isFileVideo, iframeSrc, playerId])
+  useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
-      <div ref={wrapRef} className="landing-video-wrap">
-        {introVideoUrl ? (
-          <>
-            {isFileVideo ? (
-              <video
-                ref={videoRef}
-                className="landing-video-player"
-                src={introVideoUrl}
-                autoPlay={introActive}
-                muted={false}
-                loop
-                playsInline
-                controls
-                preload="metadata"
-              />
-            ) : iframeSrc ? (
-              <iframe
-                ref={iframeRef}
-                className="landing-video-frame"
-                src={iframeSrc}
-                title="Landing intro video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                allowFullScreen
-                loading="eager"
-                referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => unmuteYoutubePlayerOnce(iframeRef.current)}
-              />
-            ) : (
-              <div className="landing-video-placeholder">
-                <p>Loading video…</p>
-              </div>
-            )}
-          </>
-        ) : (
+      <div className="landing-video-wrap">
+        {!introVideoUrl ? (
           <div className="landing-video-placeholder">
             <p>অ্যাডমিন থেকে ল্যান্ডিং ইন্ট্রো ভিডিও যোগ করুন।</p>
+          </div>
+        ) : isFileVideo ? (
+          <video
+            key={introVideoUrl}
+            className="landing-video-player"
+            src={introVideoUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+          />
+        ) : embedSrc ? (
+          <iframe
+            key={embedSrc}
+            className="landing-video-frame"
+            src={embedSrc}
+            title="Landing intro video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowFullScreen
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <div className="landing-video-placeholder">
+            <p>ভিডিও লিংকটি সঠিক নয়। Admin থেকে একটি YouTube বা ভিডিও URL দিন।</p>
           </div>
         )}
       </div>
@@ -1615,7 +1560,7 @@ function GalleryCard({ item, whatsappNumber, liveDemoLabel = siteChrome.liveDemo
   const isVideo = media.type === 'video' || Boolean(media.videoUrl?.trim())
   const videoUrl = media.videoUrl?.trim() || ''
   const playableUrl = isVideo ? getPlayableVideoUrl(videoUrl) : ''
-  const liveUrl = media.liveUrl?.trim() || ''
+  const liveUrl = resolveLiveDemoUrl(media.liveUrl)
   const imageUrl = (media.imageUrl || media.thumbnailUrl)?.trim() || ''
   const whatsappLabel = resolveWhatsappLabel(media.whatsappText, whatsappFallback)
   const thumbnail = isVideo
@@ -2864,7 +2809,7 @@ function DemoCard({ card, whatsappNumber, variant = 'landing', whatsappFallback,
   const media = withResolvedMedia(card)
   const username = media.username || 'admin'
   const password = media.password || '123456'
-  const liveUrl = media.liveUrl || '#'
+  const liveUrl = resolveLiveDemoUrl(media.liveUrl)
   const demoLabel = liveDemoLabel || siteChrome.liveDemo
   const whatsappLabel = resolveWhatsappLabel(
     media.whatsappText,
@@ -2916,7 +2861,7 @@ function DemoCard({ card, whatsappNumber, variant = 'landing', whatsappFallback,
             </p>
           </div>
           <a
-            href={liveUrl}
+            href={liveUrl || '#'}
             target="_blank"
             rel="noreferrer"
             className="product-demo-link"
@@ -2965,7 +2910,7 @@ function DemoCard({ card, whatsappNumber, variant = 'landing', whatsappFallback,
           </p>
         </div>
         <a
-          href={liveUrl}
+          href={liveUrl || '#'}
           target="_blank"
           rel="noreferrer"
           className="product-demo-link"
@@ -3261,7 +3206,13 @@ function AdminPage({ content, setContent, loading }) {
     setDraft((current) => {
       const next = structuredClone(current)
       const items = sectionPath.split('.').reduce((acc, key) => acc[key], next)
-      items[index][field] = field === 'keyFeatures' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value
+      const nextValue =
+        field === 'keyFeatures'
+          ? value.split(',').map((item) => item.trim()).filter(Boolean)
+          : field === 'liveUrl'
+            ? resolveLiveDemoUrl(value)
+            : value
+      items[index][field] = nextValue
       return next
     })
   }
@@ -3478,10 +3429,10 @@ function AdminPage({ content, setContent, loading }) {
     if (kind === 'video' && !isGalleryTarget) {
       nextItem.username = (form.username || nextItem.username || 'admin').trim()
       nextItem.password = (form.password || nextItem.password || '123456').trim()
-      nextItem.liveUrl = (form.liveUrl || nextItem.liveUrl || 'https://example.com/demo').trim()
+      nextItem.liveUrl = resolveLiveDemoUrl(form.liveUrl || nextItem.liveUrl || 'https://example.com/demo')
     }
     if (isGalleryTarget) {
-      nextItem.liveUrl = (form.liveUrl ?? nextItem.liveUrl ?? '').trim()
+      nextItem.liveUrl = resolveLiveDemoUrl(form.liveUrl ?? nextItem.liveUrl ?? '')
     }
 
     if (kind === 'video') {
@@ -3766,10 +3717,13 @@ function AdminPage({ content, setContent, loading }) {
                 <AdsUtmHelper />
               </AdminSection>
 
-              <AdminSection title="Landing Intro" description="Hero video, headline and supporting copy for the landing page.">
+              <AdminSection
+                title="Landing Intro"
+                description="শুধু এই Intro Video URL-ই ল্যান্ডিং হিরোতে চলবে — অন্য কোনো ভিডিও লিংক মিক্স হবে না। YouTube (youtu.be / watch / embed) বা MP4 দিন।"
+              >
                 <FormGrid>
                   <InputField
-                    label="Intro Video URL (YouTube or MP4 link)"
+                    label="Intro Video URL (শুধু এই লিংক)"
                     value={draft.landing.introVideoUrl}
                     onChange={(value) => updateValue('landing.introVideoUrl', value)}
                   />
@@ -4449,7 +4403,9 @@ function CollectionEditor({ title, description, items, path, fields, itemType, o
                       placeholder={
                         field === 'videoUrl'
                           ? 'https://www.youtube.com/watch?v=... or youtu.be/...'
-                          : undefined
+                          : field === 'liveUrl'
+                            ? 'https://your-demo-link.com'
+                            : undefined
                       }
                     />
                   )}
