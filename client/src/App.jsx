@@ -417,7 +417,10 @@ const getWhatsappLink = (number) => {
 const getWhatsappLinkWithMessage = (number, message) => {
   const base = getWhatsappLink(number)
   const text = String(message || '').trim()
-  return text ? `${base}?text=${encodeURIComponent(text)}` : base
+  if (!text) return base
+  // base already has ?phone=... — must append with &
+  const join = base.includes('?') ? '&' : '?'
+  return `${base}${join}text=${encodeURIComponent(text)}`
 }
 
 const BOOKING_SERVICE_OPTIONS = [
