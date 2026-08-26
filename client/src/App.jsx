@@ -3169,6 +3169,54 @@ const formatAddedDate = (value) => {
 
 const getItemsByPath = (source, path) => path.split('.').reduce((acc, key) => acc?.[key], source) || []
 
+const PUBLIC_SITE_ORIGIN = 'https://iotprogrammers.com'
+
+const adsLandingLinks = [
+  {
+    id: 'fb',
+    label: 'Facebook / Meta Ads (recommended)',
+    url: `${PUBLIC_SITE_ORIGIN}/landing?utm_source=facebook&utm_medium=paid&utm_campaign=landing&utm_content=primary`,
+  },
+  {
+    id: 'clean',
+    label: 'Landing page (no UTM)',
+    url: `${PUBLIC_SITE_ORIGIN}/landing`,
+  },
+]
+
+function AdsUtmHelper() {
+  const [copiedId, setCopiedId] = useState('')
+
+  const copyLink = async (id, url) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedId(id)
+      window.setTimeout(() => setCopiedId(''), 2000)
+    } catch {
+      window.prompt('Copy this ads URL:', url)
+    }
+  }
+
+  return (
+    <div className="admin-ads-utm">
+      <p className="admin-tracking-help">
+        Meta Ads → Destination URL-এ নিচের link paste করুন। Tracking / GTM ট্যাবে Facebook Pixel ID সেট থাকলে conversion track হবে।
+      </p>
+      {adsLandingLinks.map((item) => (
+        <div key={item.id} className="admin-ads-utm-row">
+          <div className="admin-ads-utm-meta">
+            <strong>{item.label}</strong>
+            <code className="admin-ads-utm-url">{item.url}</code>
+          </div>
+          <button type="button" className="secondary-btn" onClick={() => copyLink(item.id, item.url)}>
+            {copiedId === item.id ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AdminPage({ content, setContent, loading }) {
   const navigate = useNavigate()
   const [draft, setDraft] = useState(() => mergeContentWithDefaults(content))
@@ -3698,8 +3746,18 @@ function AdminPage({ content, setContent, loading }) {
             </AdminSection>
           )}
 
+          {activeTab === 'tracking' && (
+            <AdminSection title="Facebook Ads — Landing UTM links" description="Copy these into Meta Ads Manager as the website URL.">
+              <AdsUtmHelper />
+            </AdminSection>
+          )}
+
           {activeTab === 'landing' && (
             <>
+              <AdminSection title="Facebook Ads link" description="Use this URL as the destination when you run Meta / Facebook ads to the landing page.">
+                <AdsUtmHelper />
+              </AdminSection>
+
               <AdminSection title="Landing Intro" description="Hero video, headline and supporting copy for the landing page.">
                 <FormGrid>
                   <InputField

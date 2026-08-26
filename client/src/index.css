@@ -2990,6 +2990,46 @@ button.product-demo-link {
   line-height: 1.45;
 }
 
+.admin-ads-utm {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-ads-utm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5ebf2;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.admin-ads-utm-meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.admin-ads-utm-meta strong {
+  color: #0f2744;
+  font-size: 0.92rem;
+}
+
+.admin-ads-utm-url {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eef3f8;
+  color: #147a3f;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .admin-shell .form-grid {
   display: grid;
   grid-template-columns: 1fr;
