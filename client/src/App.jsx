@@ -1101,7 +1101,6 @@ function LandingIntroSection({ content }) {
   const videoRef = useRef(null)
   const startedRef = useRef(false)
   const [introActive, setIntroActive] = useState(true)
-  const [inView, setInView] = useState(false)
   const [iframeSrc, setIframeSrc] = useState('')
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
@@ -1116,31 +1115,9 @@ function LandingIntroSection({ content }) {
     setIntroActive(true)
   })
 
+  // Unmuted autoplay as soon as URL is ready (intro is above the fold).
   useEffect(() => {
-    const node = wrapRef.current
-    if (!node || typeof IntersectionObserver === 'undefined') {
-      setInView(true)
-      return undefined
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.05) {
-            setInView(true)
-          }
-        })
-      },
-      { threshold: [0.05, 0.2], rootMargin: '200px 0px' },
-    )
-
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [introVideoUrl])
-
-  // Unmuted autoplay as soon as the intro is in view (desktop + Cursor preview).
-  useEffect(() => {
-    if (!introVideoUrl || isFileVideo || !introActive || !inView) return undefined
+    if (!introVideoUrl || isFileVideo || !introActive) return undefined
     if (startedRef.current) return undefined
 
     const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
@@ -1153,13 +1130,13 @@ function LandingIntroSection({ content }) {
       if (!iframe) return
       iframe.src = src
       unmuteYoutubePlayerOnce(iframe)
-    }, 80)
+    }, 50)
 
     return () => window.clearTimeout(timer)
-  }, [introVideoUrl, isFileVideo, introActive, inView, playerId])
+  }, [introVideoUrl, isFileVideo, introActive, playerId])
 
   useEffect(() => {
-    if (!isFileVideo || !videoRef.current || !introActive || !inView) return undefined
+    if (!isFileVideo || !videoRef.current || !introActive) return undefined
 
     const video = videoRef.current
     video.muted = false
@@ -1167,9 +1144,9 @@ function LandingIntroSection({ content }) {
     video.playsInline = true
     video.play()?.catch?.(() => {})
     return undefined
-  }, [isFileVideo, introVideoUrl, introActive, inView])
+  }, [isFileVideo, introVideoUrl, introActive])
 
-  // First user gesture on the page re-arms unmuted play (covers mobile autoplay blocks).
+  // First user gesture re-arms unmuted play (covers mobile autoplay blocks).
   useEffect(() => {
     if (!introVideoUrl || isFileVideo || !iframeSrc) return undefined
 
@@ -1206,7 +1183,7 @@ function LandingIntroSection({ content }) {
                 ref={videoRef}
                 className="landing-video-player"
                 src={introVideoUrl}
-                autoPlay={introActive && inView}
+                autoPlay={introActive}
                 muted={false}
                 loop
                 playsInline
