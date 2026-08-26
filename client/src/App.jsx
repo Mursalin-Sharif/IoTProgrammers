@@ -2343,7 +2343,11 @@ function QuickBookingSection({ page, whatsappNumber, phone, telHref, leadSource 
 
     const message = buildBookingWhatsAppMessage(form)
     const url = getWhatsappLinkWithMessage(whatsappNumber, message)
-    window.open(url, '_blank', 'noopener,noreferrer')
+    // Prefer same-tab navigation on mobile — window.open is often blocked after form submit.
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      window.location.assign(url)
+    }
   }
 
   return (
