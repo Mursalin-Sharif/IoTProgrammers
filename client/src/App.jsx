@@ -1094,10 +1094,12 @@ function SiteFooter({ content }) {
 }
 
 function detectTouchUi() {
-  if (typeof window === 'undefined') return true
+  if (typeof window === 'undefined') return false
+  // Real phones/tablets only — do NOT use viewport width (Cursor preview is narrow
+  // but still a desktop browser and can unmuted-autoplay).
   return (
-    window.matchMedia('(hover: none), (pointer: coarse)').matches ||
-    window.matchMedia('(max-width: 900px)').matches
+    window.matchMedia('(pointer: coarse)').matches ||
+    window.matchMedia('(hover: none)').matches
   )
 }
 
@@ -1112,25 +1114,23 @@ function LandingIntroSection({ content }) {
   const [inView, setInView] = useState(false)
   const [iframeSrc, setIframeSrc] = useState('')
   const [soundOn, setSoundOn] = useState(false)
+  const [needsGesture, setNeedsGesture] = useState(false)
   const [isTouchUi, setIsTouchUi] = useState(null)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
-  const posterUrl = introVideoUrl && !isFileVideo ? getYoutubeThumbnail(introVideoUrl) : ''
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText])
 
   useEffect(() => {
     const sync = () => setIsTouchUi(detectTouchUi())
     sync()
-    const mqTouch = window.matchMedia('(hover: none), (pointer: coarse)')
-    const mqNarrow = window.matchMedia('(max-width: 900px)')
+    const mqTouch = window.matchMedia('(pointer: coarse)')
+    const mqHover = window.matchMedia('(hover: none)')
     mqTouch.addEventListener?.('change', sync)
-    mqNarrow.addEventListener?.('change', sync)
-    window.addEventListener('resize', sync)
+    mqHover.addEventListener?.('change', sync)
     return () => {
       mqTouch.removeEventListener?.('change', sync)
-      mqNarrow.removeEventListener?.('change', sync)
-      window.removeEventListener('resize', sync)
+      mqHover.removeEventListener?.('change', sync)
     }
   }, [])
 
@@ -1139,6 +1139,7 @@ function LandingIntroSection({ content }) {
     stopYoutubePlayer(iframeRef.current)
     soundLockRef.current = false
     setSoundOn(false)
+    setNeedsGesture(false)
     setIframeSrc('')
     setIntroActive(true)
   })
@@ -1165,17 +1166,27 @@ function LandingIntroSection({ content }) {
     return () => observer.disconnect()
   }, [introVideoUrl])
 
-  // Desktop: unmuted autoplay when visible.
-  // Mobile: wait for tap — mounting unmuted embed outside a gesture never gets sound.
+  // Always try unmuted autoplay when visible (works in desktop + Cursor preview).
   useEffect(() => {
     if (!introVideoUrl || isFileVideo || !introActive || !inView || isTouchUi === null) return undefined
-    if (isTouchUi || soundLockRef.current) return undefined
+    if (soundLockRef.current) return undefined
 
     const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
     setIframeSrc(src)
-    soundLockRef.current = true
     setSoundOn(true)
+    soundLockRef.current = true
     requestExclusiveVideoPlay(playerId)
+
+    // Phones usually block unmuted autoplay — offer one-tap unlock shortly after.
+    if (isTouchUi) {
+      const timer = window.setTimeout(() => {
+        setNeedsGesture(true)
+        setSoundOn(false)
+        soundLockRef.current = false
+      }, 900)
+      return () => window.clearTimeout(timer)
+    }
+
     return undefined
   }, [introVideoUrl, isFileVideo, introActive, inView, playerId, isTouchUi])
 
@@ -1183,30 +1194,41 @@ function LandingIntroSection({ content }) {
     if (!isFileVideo || !videoRef.current || !introActive || !inView || isTouchUi === null) {
       return undefined
     }
-    if (isTouchUi && !soundOn) return undefined
 
     const video = videoRef.current
     video.muted = false
     video.volume = 1
     video.playsInline = true
-    video.play()?.catch?.(() => {})
+    const playAttempt = video.play()
     soundLockRef.current = true
     setSoundOn(true)
+
+    playAttempt?.catch?.(() => {
+      if (isTouchUi) {
+        setNeedsGesture(true)
+        setSoundOn(false)
+        soundLockRef.current = false
+      }
+    })
+
     return undefined
-  }, [isFileVideo, introVideoUrl, introActive, inView, isTouchUi, soundOn])
+  }, [isFileVideo, introVideoUrl, introActive, inView, isTouchUi])
 
   const enableSound = (event) => {
     event?.preventDefault?.()
     event?.stopPropagation?.()
-    if (soundLockRef.current && soundOn) return
+    if (soundLockRef.current && soundOn && !needsGesture) return
     if (!introVideoUrl) return
 
     soundLockRef.current = true
+    setNeedsGesture(false)
     requestExclusiveVideoPlay(playerId)
 
     if (isFileVideo) {
-      setSoundOn(true)
-      setIntroActive(true)
+      flushSync(() => {
+        setSoundOn(true)
+        setIntroActive(true)
+      })
       const video = videoRef.current
       if (video) {
         video.muted = false
@@ -1218,7 +1240,6 @@ function LandingIntroSection({ content }) {
 
     const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
 
-    // Commit iframe into the DOM inside this gesture, then set src again on the real node.
     flushSync(() => {
       setIntroActive(true)
       setSoundOn(true)
@@ -1232,12 +1253,12 @@ function LandingIntroSection({ content }) {
     }
   }
 
-  const needsSoundTap = Boolean(introVideoUrl && isTouchUi === true && !soundOn && introActive)
-  const showIframe = Boolean(introVideoUrl && !isFileVideo && (isTouchUi === false || soundOn) && iframeSrc)
+  const showUnlock = Boolean(introVideoUrl && needsGesture && introActive)
+  const showIframe = Boolean(introVideoUrl && !isFileVideo && iframeSrc)
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
-      <div ref={wrapRef} className={`landing-video-wrap${needsSoundTap ? ' is-awaiting-sound' : ''}`}>
+      <div ref={wrapRef} className={`landing-video-wrap${showUnlock ? ' is-awaiting-sound' : ''}`}>
         {introVideoUrl ? (
           <>
             {isFileVideo ? (
@@ -1245,7 +1266,7 @@ function LandingIntroSection({ content }) {
                 ref={videoRef}
                 className="landing-video-player"
                 src={introVideoUrl}
-                autoPlay={introActive && inView && soundOn}
+                autoPlay={introActive && inView}
                 muted={false}
                 loop
                 playsInline
@@ -1263,15 +1284,13 @@ function LandingIntroSection({ content }) {
                 loading="eager"
                 referrerPolicy="strict-origin-when-cross-origin"
               />
-            ) : posterUrl ? (
-              <img className="landing-video-poster" src={posterUrl} alt="" />
             ) : (
               <div className="landing-video-placeholder">
                 <p>Loading video…</p>
               </div>
             )}
 
-            {needsSoundTap ? (
+            {showUnlock ? (
               <button
                 type="button"
                 className="landing-video-sound-play"
