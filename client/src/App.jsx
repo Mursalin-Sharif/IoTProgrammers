@@ -374,9 +374,26 @@ const createEmptyItem = (type = 'generic') => {
   return base
 }
 
+/** Build a wa.me link. Bangladesh numbers → country code 880 (not 88). */
 const getWhatsappLink = (number) => {
-  const digits = String(number || '01302003306').replace(/\D/g, '').replace(/^0+/, '')
-  return `https://wa.me/88${digits}`
+  let digits = String(number || '01302003306').replace(/\D/g, '')
+
+  if (!digits) {
+    digits = '8801302003306'
+  } else if (digits.startsWith('880')) {
+    // already E.164 without +
+  } else if (digits.startsWith('0')) {
+    // local 01XXXXXXXXX → 8801XXXXXXXXX
+    digits = `880${digits.replace(/^0+/, '')}`
+  } else if (digits.startsWith('88') && !digits.startsWith('880')) {
+    // fix mistaken "88" prefix (missing the trailing 0 of 880)
+    digits = `880${digits.slice(2).replace(/^0+/, '')}`
+  } else {
+    // bare national number without leading 0
+    digits = `880${digits}`
+  }
+
+  return `https://wa.me/${digits}`
 }
 
 const getWhatsappLinkWithMessage = (number, message) => {
