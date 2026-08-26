@@ -817,42 +817,70 @@ body.contact-route-body {
   border-radius: 0;
 }
 
-.landing-video-unmute-hit {
+.landing-video-poster {
   position: absolute;
   inset: 0;
-  z-index: 3;
-  display: grid;
-  place-items: end center;
-  padding: 0 0 18px;
-  margin: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.landing-video-unmute-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 18px;
-  border-radius: 999px;
-  background: rgba(8, 17, 32, 0.88);
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
 }
 
-.landing-video-unmute-hit:active .landing-video-unmute-btn {
-  transform: scale(0.98);
+.landing-video-sound-play {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(6, 16, 31, 0.42);
+  cursor: pointer;
+  color: #fff;
 }
 
-.landing-video-unmute-chip {
-  display: none;
+.landing-video-sound-play-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  position: relative;
 }
 
+.landing-video-sound-play-icon::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  border-style: solid;
+  border-width: 14px 0 14px 22px;
+  border-color: transparent transparent transparent #0b1729;
+}
+
+.landing-video-sound-play-label {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(8, 17, 32, 0.9);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.landing-video-sound-play:active .landing-video-sound-play-icon {
+  transform: scale(0.96);
+}
+
+.landing-video-unmute-hit,
+.landing-video-unmute-btn,
+.landing-video-unmute-chip,
 .landing-video-play-btn {
   display: none !important;
 }
