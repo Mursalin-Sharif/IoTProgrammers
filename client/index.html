@@ -8,35 +8,55 @@
     <meta name="robots" content="index, follow" />
     <title>IoTProgrammers</title>
     <link rel="describedby" type="text/markdown" href="/llms.txt" />
-    <link rel="preload" as="image" href="/assets/hero-home.jpg" fetchpriority="high" />
-    <link rel="preload" as="image" href="/logo-iotprogrammers.webp" type="image/webp" />
+    <link rel="preload" as="image" href="/assets/hero-home.webp" type="image/webp" fetchpriority="high" />
     <style>
       :root { color-scheme: dark; }
-      body { margin: 0; min-width: 320px; background: #081120; color: #dbe6f0; }
-      .app-shell { padding-top: 3.75rem; }
-      .site-header-wrap { position: fixed; inset: 0 0 auto 0; z-index: 40; }
-      .hero-banner-section,
-      .hero-banner-swiper,
-      .hero-banner-slide,
-      .hero-banner-fallback {
-        height: 210px;
-        min-height: 210px;
-        contain: layout paint;
+      html, body { margin: 0; min-width: 320px; background: #edf2f7; color: #081120; }
+      #boot-shell { padding-top: 3.75rem; }
+      #boot-header {
+        position: fixed; inset: 0 0 auto 0; z-index: 40; height: 3.75rem;
+        background: rgba(59, 130, 246, 0.42); backdrop-filter: blur(12px);
       }
-      .hero-banner-section { background: #0a2e1a; overflow: hidden; }
-      .hero-banner-bg { object-fit: cover; width: 100%; height: 100%; }
-      .bottom-nav {
-        position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001;
-        height: calc(55px + env(safe-area-inset-bottom, 0px));
+      #boot-hero {
+        position: relative; height: 210px; min-height: 210px; overflow: hidden;
+        background: #0a2e1a; contain: layout paint;
       }
-      .status-banner--toast {
-        position: fixed; top: 3.75rem; left: 0; right: 0; z-index: 35;
-        margin: 0; pointer-events: none;
+      #boot-hero img {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
       }
+      #boot-hero-overlay {
+        position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(8,20,12,.35) 0%, rgba(8,20,12,.72) 100%);
+      }
+      #boot-hero-copy {
+        position: relative; z-index: 1; height: 100%;
+        display: grid; place-content: center; text-align: center; padding: 0 16px; color: #fff;
+      }
+      #boot-hero-copy strong { font-size: 1.25rem; line-height: 1.2; }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static first paint so LCP does not wait on React JS -->
+      <div id="boot-shell" aria-hidden="true">
+        <div id="boot-header"></div>
+        <div id="boot-hero">
+          <picture>
+            <source srcset="/assets/hero-home.webp" type="image/webp" />
+            <img
+              src="/assets/hero-home.jpg"
+              alt=""
+              width="720"
+              height="252"
+              decoding="async"
+              fetchpriority="high"
+            />
+          </picture>
+          <div id="boot-hero-overlay"></div>
+          <div id="boot-hero-copy"><strong>IoTProgrammers</strong></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

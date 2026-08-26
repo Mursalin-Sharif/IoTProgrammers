@@ -703,7 +703,9 @@ const ensureContent = async () => {
 
   const heroSlides = existing.home?.heroSlides || [];
   const needsHeroImagePatch = heroSlides.some((slide) =>
-    String(slide.imageUrl || '').trim().includes('photo-1497366811353'),
+    /images\.unsplash\.com|photo-1497366811353|photo-1460925895917|photo-1516321318423/i.test(
+      String(slide.imageUrl || '').trim(),
+    ),
   );
   const needsHeroCtaPatch = heroSlides.some((slide) => {
     const cta = String(slide.ctaText || '').trim();
@@ -714,7 +716,11 @@ const ensureContent = async () => {
       const plain = slide.toObject?.() || slide;
       let next = { ...plain };
       const imageUrl = String(plain.imageUrl || '').trim();
-      if (imageUrl.includes('photo-1497366811353')) {
+      if (
+        /images\.unsplash\.com|photo-1497366811353|photo-1460925895917|photo-1516321318423/i.test(
+          imageUrl,
+        )
+      ) {
         next = { ...next, imageUrl: '/assets/hero-home.jpg' };
       }
       const cta = String(plain.ctaText || '').trim();

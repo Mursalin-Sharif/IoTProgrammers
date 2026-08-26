@@ -159,11 +159,12 @@ const DEFAULT_LOGO_URL = '/logo-iotprogrammers.webp'
 const DEFAULT_LOGO_WEBP_URL = '/logo-iotprogrammers.webp'
 const WHATSAPP_LINK_LABEL = siteChrome.whatsappCta
 
-function optimizeHeroImageUrl(url, width = 960) {
+function optimizeHeroImageUrl(url, width = 720) {
   const raw = String(url || '').trim()
   if (!raw) return raw
-  if (raw.startsWith('/assets/hero-home')) return raw
-  if (raw.includes('photo-1497366811353')) return '/assets/hero-home.jpg'
+  if (raw.startsWith('/assets/hero-home') || raw.includes('photo-1497366811353')) {
+    return '/assets/hero-home.jpg'
+  }
   if (raw.includes('images.unsplash.com')) {
     const next = raw.replace(/([?&])w=\d+/i, `$1w=${width}`).replace(/([?&])q=\d+/i, '$1q=70')
     return next.includes('w=') ? next : `${next}${next.includes('?') ? '&' : '?'}w=${width}&q=70`
@@ -171,13 +172,21 @@ function optimizeHeroImageUrl(url, width = 960) {
   return raw
 }
 
+function heroWebpUrl(url) {
+  const raw = String(url || '').trim()
+  if (raw.startsWith('/assets/hero-home') || raw.includes('photo-1497366811353')) {
+    return '/assets/hero-home.webp'
+  }
+  return undefined
+}
+
 function heroImageSrcSet(url) {
   const raw = String(url || '').trim()
   if (raw.startsWith('/assets/hero-home') || raw.includes('photo-1497366811353')) {
-    return '/assets/hero-home.jpg 960w'
+    return undefined
   }
   if (!raw.includes('images.unsplash.com')) return undefined
-  return [640, 960, 1200]
+  return [640, 720, 960]
     .map((width) => `${optimizeHeroImageUrl(raw, width)} ${width}w`)
     .join(', ')
 }
@@ -769,7 +778,7 @@ const scrollToTop = () => {
 
 function App() {
   const [content, setContent] = useState(fallbackContent)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -841,6 +850,7 @@ function SiteLayout({ content, loading, error }) {
     document.body.classList.toggle('reviews-route-body', isReviews)
     document.body.classList.toggle('contact-route-body', isContact)
     document.body.classList.toggle('landing-route-body', isLanding)
+    ensurePageStyles('section-blend', () => import('./section-blend.css'))
     return () => {
       document.body.classList.remove('home-route-body')
       document.body.classList.remove('reviews-route-body')
@@ -867,9 +877,8 @@ function SiteLayout({ content, loading, error }) {
       <div
         className={`app-shell${isHome ? ' home-shell' : ''}${isLanding ? ' landing-shell' : ''}${isReviews ? ' reviews-shell' : ''}${isContact ? ' contact-shell' : ''}`}
       >
-        {loading && <div className="status-banner status-banner--toast">{siteChrome.loading}</div>}
         {error && (
-          <div className="status-banner warning">
+          <div className="status-banner status-banner--toast warning">
             {error === 'Backend unavailable. Showing fallback content.' ? siteChrome.backendError : error}
           </div>
         )}
@@ -1019,10 +1028,10 @@ function BottomNav() {
             src="/assets/home-button.min.gif"
             alt=""
             className="bottom-nav-center-img"
-            width={72}
-            height={72}
+            width={46}
+            height={46}
             decoding="async"
-            loading="eager"
+            loading="lazy"
             fetchPriority="low"
           />
         </NavLink>
@@ -2076,23 +2085,27 @@ function HomePage({ content }) {
   useScrollSideIn(rootRef, [content.home, content.pricing])
 
   const renderHeroSlide = (slide, imagePriority = 'auto') => {
-    const heroSrc = optimizeHeroImageUrl(resolveMediaUrl(slide.imageUrl), imagePriority === 'high' ? 960 : 640)
+    const heroSrc = optimizeHeroImageUrl(resolveMediaUrl(slide.imageUrl), imagePriority === 'high' ? 720 : 640)
     const heroSet = heroImageSrcSet(slide.imageUrl)
+    const heroWebp = heroWebpUrl(slide.imageUrl)
 
     return (
     <article className="hero-banner-slide">
-      <img
-        src={heroSrc}
-        srcSet={heroSet}
-        sizes="100vw"
-        alt={slide.title}
-        className="hero-banner-bg"
-        width={1200}
-        height={420}
-        decoding="async"
-        loading={imagePriority === 'high' ? 'eager' : 'lazy'}
-        fetchPriority={imagePriority}
-      />
+      <picture>
+        {heroWebp ? <source srcSet={heroWebp} type="image/webp" /> : null}
+        <img
+          src={heroSrc}
+          srcSet={heroSet}
+          sizes="100vw"
+          alt={slide.title}
+          className="hero-banner-bg"
+          width={720}
+          height={252}
+          decoding="async"
+          loading={imagePriority === 'high' ? 'eager' : 'lazy'}
+          fetchPriority={imagePriority === 'high' ? 'high' : 'low'}
+        />
+      </picture>
       <div className="hero-banner-overlay" aria-hidden="true" />
       <div className="hero-banner-content">
         {slide.badge && <span className="hero-banner-badge">{slide.badge}</span>}

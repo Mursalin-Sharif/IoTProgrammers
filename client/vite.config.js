@@ -1,11 +1,29 @@
 ﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+/** Load built CSS without blocking first paint (critical CSS stays inline in index.html). */
+function asyncCssPlugin() {
+  return {
+    name: 'async-css',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      return html.replace(/<link\s+rel="stylesheet"([^>]*?)>/g, (_match, attrs) => {
+        const cleaned = String(attrs || '').replace(/\s*\/?\s*$/, '')
+        return [
+          `<link rel="preload" as="style"${cleaned} onload="this.onload=null;this.rel='stylesheet'">`,
+          `<noscript><link rel="stylesheet"${cleaned}></noscript>`,
+        ].join('')
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), asyncCssPlugin()],
   build: {
     // Avoid preloading deferred chunks (gsap/swiper) on first paint.
     modulePreload: false,
+    cssCodeSplit: true,
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {

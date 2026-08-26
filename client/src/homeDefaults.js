@@ -19,8 +19,7 @@ const homeDefaults = {
       subtitle: 'Carousel banners · Demo cards · Reviews · Full admin dashboard',
       ctaText: 'View Demos',
       ctaLink: '/',
-      imageUrl:
-        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&q=80',
+      imageUrl: '/assets/hero-home.jpg',
     },
     {
       badge: 'IoTProgrammers',
@@ -28,8 +27,7 @@ const homeDefaults = {
       subtitle: 'Custom development · Responsive design · Client-ready demos',
       ctaText: 'WhatsApp Now',
       ctaLink: 'https://wa.me/8801302003306',
-      imageUrl:
-        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1600&q=80',
+      imageUrl: '/assets/hero-home.jpg',
     },
   ],
   featureCards: [
