@@ -374,26 +374,44 @@ const createEmptyItem = (type = 'generic') => {
   return base
 }
 
-/** Build a wa.me link. Bangladesh numbers → country code 880 (not 88). */
-const getWhatsappLink = (number) => {
-  let digits = String(number || '01302003306').replace(/\D/g, '')
+const BD_WHATSAPP_E164 = '8801302003306'
 
-  if (!digits) {
-    digits = '8801302003306'
-  } else if (digits.startsWith('880')) {
-    // already E.164 without +
-  } else if (digits.startsWith('0')) {
-    // local 01XXXXXXXXX → 8801XXXXXXXXX
-    digits = `880${digits.replace(/^0+/, '')}`
-  } else if (digits.startsWith('88') && !digits.startsWith('880')) {
-    // fix mistaken "88" prefix (missing the trailing 0 of 880)
-    digits = `880${digits.slice(2).replace(/^0+/, '')}`
-  } else {
-    // bare national number without leading 0
-    digits = `880${digits}`
+/** Normalize any BD mobile / wa.me / api.whatsapp URL to digits with country code 880. */
+const toWhatsappE164 = (numberOrUrl) => {
+  const raw = String(numberOrUrl || '').trim()
+  if (!raw) return BD_WHATSAPP_E164
+
+  const fromQuery = raw.match(/[?&]phone=(\d{10,15})/i)?.[1]
+  const fromPath = raw.match(/wa\.me\/(\d{10,15})/i)?.[1]
+  let digits = (fromQuery || fromPath || raw).replace(/\D/g, '')
+
+  if (!digits) return BD_WHATSAPP_E164
+
+  // Already correct: 8801XXXXXXXXX (13 digits)
+  if (/^8801\d{9}$/.test(digits)) return digits
+
+  // Broken legacy: 881XXXXXXXXX (12 digits, missing 0 of 880)
+  if (/^881\d{9}$/.test(digits)) return `880${digits.slice(2)}`
+
+  // Local 01XXXXXXXXX
+  if (/^01\d{9}$/.test(digits)) return `880${digits.slice(1)}`
+
+  // National without leading 0: 1XXXXXXXXX
+  if (/^1\d{9}$/.test(digits)) return `880${digits}`
+
+  if (digits.startsWith('880')) return digits
+  if (digits.startsWith('0')) return `880${digits.replace(/^0+/, '')}`
+  if (digits.startsWith('88') && !digits.startsWith('880')) {
+    return `880${digits.slice(2).replace(/^0+/, '')}`
   }
 
-  return `https://wa.me/${digits}`
+  return `880${digits.replace(/^0+/, '')}`
+}
+
+/** Official WhatsApp click-to-chat link (avoids wa.me country-code confusion on some phones). */
+const getWhatsappLink = (number) => {
+  const e164 = toWhatsappE164(number || BD_WHATSAPP_E164)
+  return `https://api.whatsapp.com/send?phone=${e164}`
 }
 
 const getWhatsappLinkWithMessage = (number, message) => {
@@ -986,13 +1004,17 @@ function BottomNav() {
 }
 
 function FloatingWhatsapp({ number }) {
+  const e164 = toWhatsappE164(number || BD_WHATSAPP_E164)
+  const href = getWhatsappLink(e164)
+
   return (
     <a
       className="floating-whatsapp"
-      href={getWhatsappLink(number || '01302003306')}
+      href={href}
       target="_blank"
       rel="noreferrer"
       aria-label="WhatsApp"
+      data-wa={e164}
       onClick={(event) => {
         trackContact(
           { content_name: 'Floating WhatsApp', lead_source: 'floating_whatsapp' },
@@ -2136,7 +2158,9 @@ function ReviewsPage({ content }) {
   const reviewsConfig = content.reviewsPage || reviewsPageDefaults
   const featuredReviews = reviewsConfig.featuredReviews || []
   const groupedReviews = groupReviewsByCategory(reviewsConfig.reviews || [])
-  const whatsappLink = reviewsConfig.ctaWhatsappLink || getWhatsappLink(content.siteSettings.whatsappNumber)
+  const whatsappLink = getWhatsappLink(
+    reviewsConfig.ctaWhatsappLink || content.siteSettings.whatsappNumber,
+  )
   const callLink = reviewsConfig.ctaCallLink || `tel:${content.siteSettings.contactPhone || content.contact.phone || '01302003306'}`
 
   useScrollSideIn(rootRef, [reviewsConfig])
