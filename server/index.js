@@ -515,9 +515,12 @@ const ensureContent = async () => {
   const patch = {};
 
   if (!existing.landing?.introVideoUrl) {
-    // Do not inject a sample YouTube URL — admin must set Landing intro video.
-  } else if (existing.landing.introVideoUrl.includes('youtube.com/embed/jNQXAC9IVRw')) {
-    patch['landing.introVideoUrl'] = defaultContent.landing.introVideoUrl || '';
+    // Keep empty until admin sets Landing intro video — never force a sample URL.
+  } else if (
+    existing.landing.introVideoUrl.includes('youtube.com/embed/jNQXAC9IVRw') &&
+    defaultContent.landing.introVideoUrl
+  ) {
+    patch['landing.introVideoUrl'] = defaultContent.landing.introVideoUrl;
   }
   if (!existing.landing?.headline) {
     patch['landing.headline'] = defaultContent.landing.headline;

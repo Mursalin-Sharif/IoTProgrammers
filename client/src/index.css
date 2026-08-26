@@ -851,6 +851,8 @@ body.contact-route-body {
   background: rgba(6, 16, 31, 0.28);
   cursor: pointer;
   color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .landing-video-sound-play-icon {
