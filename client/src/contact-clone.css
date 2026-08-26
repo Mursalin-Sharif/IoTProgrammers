@@ -1103,6 +1103,10 @@
     0 18px 48px rgb(8 76 43 / 0.28),
     0 0 0 1px rgb(255 255 255 / 0.12);
   text-align: left;
+  /* Never let scroll animations shove the booking form off-screen. */
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .cp-booking-header {
@@ -1267,6 +1271,9 @@
   justify-content: center;
   gap: 14px;
   margin-top: 28px;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .cp-booking-pill {

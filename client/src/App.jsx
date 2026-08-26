@@ -2084,6 +2084,12 @@ function HomePage({ content }) {
 
   useScrollSideIn(rootRef, [content.home, content.pricing])
 
+  useEffect(() => {
+    ensurePageStyles('contact-clone', () => import('./contact-clone.css'))
+    ensurePageStyles('pricing-cards', () => import('./pricing-cards.css'))
+    ensurePageStyles('comparison-cards', () => import('./comparison-cards.css'))
+  }, [])
+
   const renderHeroSlide = (slide, imagePriority = 'auto') => {
     const heroSrc = optimizeHeroImageUrl(resolveMediaUrl(slide.imageUrl), imagePriority === 'high' ? 720 : 640)
     const heroSet = heroImageSrcSet(slide.imageUrl)
@@ -2503,7 +2509,7 @@ function QuickBookingSection({ page, whatsappNumber, phone, telHref, leadSource 
   return (
     <section id="quick-booking" className="asr-booking-section cp-booking section-blend">
       <div className="cp-booking-inner">
-        <article className="cp-booking-card" data-animate={sideInAttr(0)}>
+        <article className="cp-booking-card">
           <header className="cp-booking-header">
             <span className="cp-booking-eyebrow">Project inquiry</span>
             <h2>{page.bookingTitle || 'Quick Booking, sends to our WhatsApp'}</h2>
@@ -2614,7 +2620,7 @@ function QuickBookingSection({ page, whatsappNumber, phone, telHref, leadSource 
           </form>
         </article>
 
-        <div className="cp-booking-pills" data-animate={sideInAttr(1)}>
+        <div className="cp-booking-pills">
           <a
             className="cp-booking-pill cp-booking-pill--wa"
             href={getWhatsappLink(whatsappNumber)}

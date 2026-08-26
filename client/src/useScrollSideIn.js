@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
 
 const SWIPER_GUARD = '.swiper, .swiper-wrapper, .swiper-slide'
+const SKIP_ANIMATE =
+  '.cp-booking-card, .cp-booking-pills, .cp-booking-form, form, input, textarea, select, button'
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 /**
  * Side-in scroll reveals for elements with data-animate="left|right".
  * GSAP is loaded on demand so it is not in the critical first-paint path.
+ * Plays once into place — no reverse — so forms/cards do not slide off-screen mid-use.
  */
 export function useScrollSideIn(rootRef, deps = []) {
   useEffect(() => {
@@ -31,30 +34,35 @@ export function useScrollSideIn(rootRef, deps = []) {
       gsapRef = gsap
 
       targets = Array.from(root.querySelectorAll('[data-animate="left"], [data-animate="right"]')).filter(
-        (el) => !el.closest(SWIPER_GUARD),
+        (el) => !el.closest(SWIPER_GUARD) && !el.matches(SKIP_ANIMATE) && !el.closest('.cp-booking'),
       )
       if (!targets.length) return
 
       const isNarrow = window.matchMedia('(max-width: 767px)').matches
-      const offset = isNarrow ? '36vw' : '100vw'
+      const offset = isNarrow ? '28vw' : '72vw'
 
       targets.forEach((el) => {
         const side = el.getAttribute('data-animate')
         const fromX = side === 'right' ? offset : `-${offset}`
 
+        // Start from natural layout so late GSAP init cannot yank visible UI sideways.
+        gsap.set(el, { clearProps: 'transform,opacity,visibility' })
+
         const tween = gsap.fromTo(
           el,
-          { x: fromX, autoAlpha: isNarrow ? 0.2 : 1 },
+          { x: fromX, autoAlpha: isNarrow ? 0.35 : 1 },
           {
             x: 0,
             autoAlpha: 1,
-            duration: isNarrow ? 0.65 : 0.85,
+            duration: isNarrow ? 0.55 : 0.75,
             ease: 'power3.out',
             overwrite: 'auto',
+            immediateRender: false,
             scrollTrigger: {
               trigger: el,
-              start: 'top 92%',
-              toggleActions: 'play reverse play reverse',
+              start: 'top 90%',
+              once: true,
+              toggleActions: 'play none none none',
               invalidateOnRefresh: true,
             },
           },
@@ -66,7 +74,6 @@ export function useScrollSideIn(rootRef, deps = []) {
       ScrollTrigger.refresh()
     }
 
-    // Idle defer — keep first paint free of GSAP parse/exec cost.
     const start = () => {
       if (cancelled) return
       run().catch(() => {})
