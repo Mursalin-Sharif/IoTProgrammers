@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
   ChevronDown,
@@ -154,8 +154,27 @@ const withResolvedMedia = (item) => {
   }
 }
 
-const DEFAULT_LOGO_URL = '/logo-iotprogrammers.png'
+const DEFAULT_LOGO_URL = '/logo-iotprogrammers.webp'
 const DEFAULT_LOGO_WEBP_URL = '/logo-iotprogrammers.webp'
+const WHATSAPP_LINK_LABEL = siteChrome.whatsappCta
+
+function optimizeHeroImageUrl(url, width = 960) {
+  const raw = String(url || '').trim()
+  if (!raw) return raw
+  if (raw.includes('images.unsplash.com')) {
+    const next = raw.replace(/([?&])w=\d+/i, `$1w=${width}`).replace(/([?&])q=\d+/i, '$1q=75')
+    return next.includes('w=') ? next : `${next}${next.includes('?') ? '&' : '?'}w=${width}&q=75`
+  }
+  return raw
+}
+
+function heroImageSrcSet(url) {
+  const raw = String(url || '').trim()
+  if (!raw.includes('images.unsplash.com')) return undefined
+  return [640, 960, 1200]
+    .map((width) => `${optimizeHeroImageUrl(raw, width)} ${width}w`)
+    .join(', ')
+}
 
 function BrandLogoImage({ src, className, width = 40, height = 40, eager = false }) {
   const resolved = resolveMediaUrl(src)
@@ -164,34 +183,18 @@ function BrandLogoImage({ src, className, width = 40, height = 40, eager = false
     src === DEFAULT_LOGO_URL ||
     /\/logo-iotprogrammers\.(png|jpg|jpeg|webp)$/i.test(String(src))
 
-  if (useDefaultWebp) {
-    return (
-      <picture>
-        <source srcSet={DEFAULT_LOGO_WEBP_URL} type="image/webp" />
-        <img
-          src={DEFAULT_LOGO_URL}
-          alt=""
-          className={className}
-          width={width}
-          height={height}
-          decoding="async"
-          loading={eager ? 'eager' : 'lazy'}
-          fetchPriority={eager ? 'high' : 'low'}
-        />
-      </picture>
-    )
-  }
+  const logoSrc = useDefaultWebp ? DEFAULT_LOGO_WEBP_URL : resolved
 
   return (
     <img
-      src={resolved}
+      src={logoSrc}
       alt=""
       className={className}
       width={width}
       height={height}
       decoding="async"
       loading={eager ? 'eager' : 'lazy'}
-      fetchPriority={eager ? 'high' : 'auto'}
+      fetchPriority={eager ? 'high' : 'low'}
     />
   )
 }
@@ -858,7 +861,7 @@ function SiteLayout({ content, loading, error }) {
       <div
         className={`app-shell${isHome ? ' home-shell' : ''}${isLanding ? ' landing-shell' : ''}${isReviews ? ' reviews-shell' : ''}${isContact ? ' contact-shell' : ''}`}
       >
-        {loading && <div className="status-banner">{siteChrome.loading}</div>}
+        {loading && <div className="status-banner status-banner--toast">{siteChrome.loading}</div>}
         {error && (
           <div className="status-banner warning">
             {error === 'Backend unavailable. Showing fallback content.' ? siteChrome.backendError : error}
@@ -867,7 +870,7 @@ function SiteLayout({ content, loading, error }) {
         <main className={`page-shell${isReviews ? ' reviews-page-shell' : ''}${isContact ? ' contact-page-shell' : ''}`}>
           <Routes>
             <Route path="/" element={<HomePage content={content} />} />
-            <Route path="/home" element={<HomePage content={content} />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/landing" element={<LandingPage content={content} />} />
             <Route path="/reviews" element={<ReviewsPage content={content} />} />
             <Route path="/contact" element={<ContactPage content={content} />} />
@@ -898,13 +901,13 @@ function SiteHeader({ content, variant = 'dark' }) {
     <div className={`site-header-wrap${variant === 'light' ? ' site-header-wrap-light' : ''}`}>
       <header className={`site-header${variant === 'light' ? ' site-header-light' : ''}`}>
         <div className="site-header-inner">
-          <NavLink to="/" className="brand-lockup" onClick={closeMenu} aria-label={brandLabel}>
+          <NavLink to="/" className="brand-lockup" onClick={closeMenu} aria-label={siteChrome.home}>
             {logoUrl ? (
               <BrandLogoImage src={logoUrl} className="brand-logo-img" width={36} height={36} eager />
             ) : (
               <div className="brand-logo">{settings.logoText || 'IP'}</div>
             )}
-            <span className="brand-title">{brandLabel}</span>
+            <span className="brand-title" aria-hidden="true">{brandLabel}</span>
           </NavLink>
 
           <div className="header-actions">
@@ -1013,7 +1016,7 @@ function BottomNav() {
             width={72}
             height={72}
             decoding="async"
-            loading="lazy"
+            loading="eager"
             fetchPriority="low"
           />
         </NavLink>
@@ -1061,7 +1064,7 @@ function FloatingWhatsapp({ number }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      aria-label="WhatsApp"
+          aria-label={WHATSAPP_LINK_LABEL}
       data-wa={e164}
       onClick={(event) => {
         trackContact(
@@ -1136,6 +1139,7 @@ function SiteFooter({ content }) {
                   href={whatsappHref}
                   target="_blank"
                   rel="noreferrer"
+                  aria-label={WHATSAPP_LINK_LABEL}
                   onClick={(event) => {
                     trackContact(
                       { content_name: 'Footer WhatsApp', lead_source: 'footer_whatsapp' },
@@ -1143,7 +1147,7 @@ function SiteFooter({ content }) {
                     )
                   }}
                 >
-                  {phone} (WhatsApp)
+                  {WHATSAPP_LINK_LABEL}
                 </a>
               )}
               {settings.contactEmail && (
@@ -2057,10 +2061,16 @@ function HomePage({ content }) {
 
   useScrollSideIn(rootRef, [content.home, content.pricing])
 
-  const renderHeroSlide = (slide, imagePriority = 'auto') => (
+  const renderHeroSlide = (slide, imagePriority = 'auto') => {
+    const heroSrc = optimizeHeroImageUrl(resolveMediaUrl(slide.imageUrl), imagePriority === 'high' ? 960 : 640)
+    const heroSet = heroImageSrcSet(slide.imageUrl)
+
+    return (
     <article className="hero-banner-slide">
       <img
-        src={resolveMediaUrl(slide.imageUrl)}
+        src={heroSrc}
+        srcSet={heroSet}
+        sizes="100vw"
         alt={slide.title}
         className="hero-banner-bg"
         width={1200}
@@ -2087,6 +2097,7 @@ function HomePage({ content }) {
               className={`hero-banner-cta${isWaCta ? ' whatsapp-btn' : ''}`}
               target={opensExternal ? '_blank' : undefined}
               rel={opensExternal ? 'noreferrer' : undefined}
+              aria-label={isWaCta ? WHATSAPP_LINK_LABEL : undefined}
               onClick={(event) => {
                 if (!isWaCta) return
                 trackContact(
@@ -2104,7 +2115,8 @@ function HomePage({ content }) {
         })()}
       </div>
     </article>
-  )
+    )
+  }
 
   return (
     <div ref={rootRef} className="page-stack home-page">

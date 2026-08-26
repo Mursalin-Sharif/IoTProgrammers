@@ -1,0 +1,23 @@
+# IoTProgrammers
+
+> MERN portfolio and demo website for IoTProgrammers — landing pages, product demos, client reviews, WhatsApp booking, and admin-managed content.
+
+IoTProgrammers builds high-converting MERN stack portfolio sites with admin dashboards, demo video cards, and WhatsApp lead capture.
+
+## Pages
+
+- [Home](https://iotprogrammers.com/): Hero banners, feature cards, product demos, pricing, and booking.
+- [Landing](https://iotprogrammers.com/landing): Bangla landing page with intro video, demo cards, reviews, and gallery.
+- [Reviews](https://iotprogrammers.com/reviews): Client testimonials and ratings.
+- [Contact](https://iotprogrammers.com/contact): Phone, WhatsApp, address, and quick booking form.
+
+## Legal
+
+- [Privacy Policy](https://iotprogrammers.com/privacy-policy): Data and privacy practices.
+- [Terms of Service](https://iotprogrammers.com/terms-of-service): Terms of use.
+- [Cookie Policy](https://iotprogrammers.com/cookie-policy): Cookie usage.
+- [Refund Policy](https://iotprogrammers.com/refund-policy): Refund terms.
+
+## Optional
+
+- [GitHub](https://github.com/Mursalin-Sharif/IoTProgrammers): Source repository.

@@ -5,8 +5,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="IoTProgrammers — MERN demos, IoT portfolio, and WhatsApp booking." />
+    <meta name="robots" content="index, follow" />
     <title>IoTProgrammers</title>
+    <link rel="describedby" type="text/markdown" href="/llms.txt" />
     <link rel="preload" as="image" href="/logo-iotprogrammers.webp" type="image/webp" />
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-width: 320px; background: #081120; color: #dbe6f0; }
+      .app-shell { padding-top: 3.75rem; }
+      .site-header-wrap { position: fixed; inset: 0 0 auto 0; z-index: 40; }
+      .hero-banner-section,
+      .hero-banner-swiper,
+      .hero-banner-slide,
+      .hero-banner-fallback { height: 210px; min-height: 210px; contain: layout paint; }
+      .bottom-nav {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001;
+        height: calc(55px + env(safe-area-inset-bottom, 0px));
+      }
+      .status-banner--toast {
+        position: fixed; top: 3.75rem; left: 0; right: 0; z-index: 35;
+        margin: 0; pointer-events: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

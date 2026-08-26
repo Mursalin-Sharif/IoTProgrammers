@@ -988,6 +988,11 @@ if (fs.existsSync(clientDistDir)) {
           res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
           return;
         }
+        if (/\.(txt|xml)$/i.test(base)) {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return;
+        }
         res.setHeader('Cache-Control', 'public, max-age=3600');
       },
     }),
