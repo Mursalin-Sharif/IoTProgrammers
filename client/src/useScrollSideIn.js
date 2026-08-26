@@ -28,24 +28,25 @@ export function useScrollSideIn(rootRef, deps = []) {
 
     const triggers = []
     const isNarrow = window.matchMedia('(max-width: 767px)').matches
-    const offset = isNarrow ? 56 : '100vw'
+    // Soft offset on mobile keeps 2-col grids intact; desktop keeps full side-run.
+    const offset = isNarrow ? '36vw' : '100vw'
 
     targets.forEach((el) => {
       const side = el.getAttribute('data-animate')
-      const fromX = side === 'right' ? offset : typeof offset === 'number' ? -offset : `-${offset}`
+      const fromX = side === 'right' ? offset : `-${offset}`
 
       const tween = gsap.fromTo(
         el,
-        { x: fromX, autoAlpha: isNarrow ? 0.35 : 1 },
+        { x: fromX, autoAlpha: isNarrow ? 0.2 : 1 },
         {
           x: 0,
           autoAlpha: 1,
-          duration: isNarrow ? 0.55 : 0.85,
+          duration: isNarrow ? 0.65 : 0.85,
           ease: 'power3.out',
           overwrite: 'auto',
           scrollTrigger: {
             trigger: el,
-            start: 'top 90%',
+            start: 'top 92%',
             toggleActions: 'play reverse play reverse',
             invalidateOnRefresh: true,
           },

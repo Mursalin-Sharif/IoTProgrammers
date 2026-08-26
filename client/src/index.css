@@ -779,13 +779,6 @@ body.contact-route-body {
   align-items: center;
 }
 
-.landing-intro-hero {
-  padding-top: 3.75rem;
-  display: grid;
-  gap: 20px;
-  margin-bottom: 8px;
-}
-
 .landing-shell {
   padding-top: 12px;
 }
@@ -799,6 +792,20 @@ body.contact-route-body {
   box-shadow: none;
 }
 
+.landing-intro-hero {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  margin-bottom: 8px;
+  padding: 3.75rem 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .landing-video-wrap {
   position: relative;
   width: 100%;
@@ -806,27 +813,48 @@ body.contact-route-body {
   background: #06101f;
   height: clamp(240px, 56.25vw, 640px);
   max-height: 72vh;
+  margin: 0;
+  border-radius: 0;
 }
 
-.landing-video-play-btn {
+.landing-video-unmute-hit {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   display: grid;
-  place-items: center;
+  place-items: end center;
+  padding: 0 0 18px;
   margin: 0;
   border: 0;
-  background: rgba(6, 16, 31, 0.45);
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  background: transparent;
   cursor: pointer;
 }
 
-.landing-video-play-btn:hover,
-.landing-video-play-btn:focus-visible {
-  background: rgba(6, 16, 31, 0.58);
+.landing-video-unmute-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: rgba(8, 17, 32, 0.88);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.landing-video-unmute-hit:active .landing-video-unmute-btn {
+  transform: scale(0.98);
+}
+
+.landing-video-unmute-chip {
+  display: none;
+}
+
+.landing-video-play-btn {
+  display: none !important;
 }
 
 .landing-video-placeholder {
@@ -1358,9 +1386,18 @@ body.contact-route-body {
   align-items: stretch;
 }
 
-.home-page .products-grid > .product-card {
+.home-page .products-grid > .product-card,
+.home-page .products-grid > [data-animate] {
   min-width: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-page .products-grid > [data-animate] > .product-card {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }

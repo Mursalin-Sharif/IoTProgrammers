@@ -1056,21 +1056,49 @@ function SiteFooter({ content }) {
   )
 }
 
+function detectTouchUi() {
+  if (typeof window === 'undefined') return true
+  // Prefer CSS interaction/viewport signals — maxTouchPoints alone is too noisy on Windows laptops.
+  return (
+    window.matchMedia('(hover: none), (pointer: coarse)').matches ||
+    window.matchMedia('(max-width: 900px)').matches
+  )
+}
+
 function LandingIntroSection({ content }) {
   const rootRef = useRef(null)
   const wrapRef = useRef(null)
   const iframeRef = useRef(null)
   const playerId = useId()
   const videoRef = useRef(null)
+  const soundArmedRef = useRef(false)
+  const enableSoundRef = useRef(() => {})
   const [introActive, setIntroActive] = useState(true)
   const [inView, setInView] = useState(false)
   const [iframeSrc, setIframeSrc] = useState('')
   const [playNonce, setPlayNonce] = useState(0)
-  const [needsTap, setNeedsTap] = useState(false)
+  const [soundOn, setSoundOn] = useState(false)
+  // null until measured — avoids loading unmuted first on mobile (autoplay blocked)
+  const [isTouchUi, setIsTouchUi] = useState(null)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText])
+
+  useEffect(() => {
+    const sync = () => setIsTouchUi(detectTouchUi())
+    sync()
+    const mqTouch = window.matchMedia('(hover: none), (pointer: coarse)')
+    const mqNarrow = window.matchMedia('(max-width: 900px)')
+    mqTouch.addEventListener?.('change', sync)
+    mqNarrow.addEventListener?.('change', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      mqTouch.removeEventListener?.('change', sync)
+      mqNarrow.removeEventListener?.('change', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
 
   useExclusiveVideo(playerId, () => {
     setIntroActive(false)
@@ -1088,54 +1116,77 @@ function LandingIntroSection({ content }) {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.15) {
             setInView(true)
           }
         })
       },
-      { threshold: [0.25, 0.5], rootMargin: '40px 0px' },
+      { threshold: [0.15, 0.35], rootMargin: '120px 0px' },
     )
 
     observer.observe(node)
     return () => observer.disconnect()
   }, [introVideoUrl])
 
+  // Mobile: muted autoplay (only mode browsers allow). Sound starts on first user gesture.
+  // Desktop: unmuted autoplay. Wait until touch mode is known.
   useEffect(() => {
-    if (!introVideoUrl || isFileVideo || !introActive || !inView) {
+    if (!introVideoUrl || isFileVideo || !introActive || !inView || isTouchUi === null) {
       if (!introActive) setIframeSrc('')
       return undefined
     }
 
-    const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
+    // Keep muted embed while awaiting gesture — never remount unmuted via React state
+    // (async remount loses the user-gesture token and mobile blocks sound).
+    if (soundArmedRef.current) return undefined
+
+    const src = getPlayableVideoUrl(introVideoUrl, {
+      autoplay: true,
+      muted: Boolean(isTouchUi),
+    })
+
     const timer = window.setTimeout(() => {
-      setIframeSrc(withSound)
+      setIframeSrc(src)
       setPlayNonce((value) => value + 1)
-      setNeedsTap(false)
       requestExclusiveVideoPlay(playerId)
-    }, 80)
+    }, 40)
 
-    const fallback = window.setTimeout(() => setNeedsTap(true), 1600)
-
-    return () => {
-      window.clearTimeout(timer)
-      window.clearTimeout(fallback)
-    }
-  }, [introVideoUrl, isFileVideo, introActive, inView, playerId])
+    return () => window.clearTimeout(timer)
+  }, [introVideoUrl, isFileVideo, introActive, inView, playerId, isTouchUi])
 
   useEffect(() => {
-    if (!isFileVideo || !videoRef.current || !introActive || !inView) return undefined
+    if (!isFileVideo || !videoRef.current || !introActive || !inView || isTouchUi === null) {
+      return undefined
+    }
 
     const video = videoRef.current
-    video.muted = false
+    video.muted = Boolean(isTouchUi) && !soundOn
     video.volume = 1
     video.playsInline = true
-    video.play()?.catch?.(() => setNeedsTap(true))
+    video.setAttribute('playsinline', '')
+    video.setAttribute('webkit-playsinline', '')
+    video.play()?.catch?.(() => {})
 
     return undefined
-  }, [isFileVideo, introVideoUrl, introActive, inView])
+  }, [isFileVideo, introVideoUrl, introActive, inView, isTouchUi, soundOn])
 
-  const playWithSound = () => {
-    setNeedsTap(false)
+  const handshakeYoutube = () => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentWindow) return
+    iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: playerId }), '*')
+    postYoutubeCommand(iframe, 'playVideo')
+    if (soundArmedRef.current) {
+      postYoutubeCommand(iframe, 'unMute')
+      postYoutubeCommand(iframe, 'setVolume', [100])
+    }
+  }
+
+  const enableSound = (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
+    if (soundArmedRef.current && soundOn) return
+    soundArmedRef.current = true
+    setSoundOn(true)
     setIntroActive(true)
     setInView(true)
     requestExclusiveVideoPlay(playerId)
@@ -1147,20 +1198,58 @@ function LandingIntroSection({ content }) {
       return
     }
 
-    if (!introVideoUrl) return
-    const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
-    setIframeSrc(withSound)
-    setPlayNonce((value) => value + 1)
+    const iframe = iframeRef.current
+    const withSound = introVideoUrl
+      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
+      : ''
+
+    // Assign src synchronously inside the user gesture — this is what lets mobile
+    // start YouTube with audio. Keep React state in sync so re-render does not
+    // reset the iframe back to mute=1.
+    if (withSound) {
+      if (iframe) iframe.src = withSound
+      setIframeSrc(withSound)
+    }
+
+    handshakeYoutube()
+    postYoutubeCommand(iframe, 'unMute')
+    postYoutubeCommand(iframe, 'setVolume', [100])
+    postYoutubeCommand(iframe, 'playVideo')
     window.setTimeout(() => {
       postYoutubeCommand(iframeRef.current, 'unMute')
-      postYoutubeCommand(iframeRef.current, 'playVideo')
       postYoutubeCommand(iframeRef.current, 'setVolume', [100])
-    }, 350)
+      postYoutubeCommand(iframeRef.current, 'playVideo')
+    }, 250)
   }
+
+  enableSoundRef.current = enableSound
+
+  // First tap anywhere on the page unlocks sound (mobile autoplay-with-sound is blocked).
+  useEffect(() => {
+    if (isTouchUi !== true || soundOn || !iframeSrc) return undefined
+
+    const unlock = (event) => {
+      enableSoundRef.current?.(event)
+    }
+
+    window.addEventListener('pointerdown', unlock, { passive: false })
+    window.addEventListener('touchstart', unlock, { passive: false })
+    window.addEventListener('click', unlock)
+
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('click', unlock)
+    }
+  }, [isTouchUi, soundOn, iframeSrc])
+
+  const showUnmuteHint = Boolean(
+    introVideoUrl && inView && introActive && isTouchUi === true && !soundOn,
+  )
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
-      <div ref={wrapRef} className="landing-video-wrap">
+      <div ref={wrapRef} className={`landing-video-wrap${showUnmuteHint ? ' is-awaiting-sound' : ''}`}>
         {introVideoUrl ? (
           <>
             {isFileVideo ? (
@@ -1169,11 +1258,11 @@ function LandingIntroSection({ content }) {
                 className="landing-video-player"
                 src={introVideoUrl}
                 autoPlay={introActive && inView}
+                muted={isTouchUi !== false && !soundOn}
                 loop
                 playsInline
                 controls
                 preload="auto"
-                onPlay={() => setNeedsTap(false)}
               />
             ) : iframeSrc ? (
               <iframe
@@ -1186,15 +1275,22 @@ function LandingIntroSection({ content }) {
                 allowFullScreen
                 loading="eager"
                 referrerPolicy="strict-origin-when-cross-origin"
+                onLoad={handshakeYoutube}
               />
             ) : (
               <div className="landing-video-placeholder">
                 <p>Loading video…</p>
               </div>
             )}
-            {needsTap ? (
-              <button type="button" className="landing-video-play-btn" onClick={playWithSound}>
-                Play with sound
+
+            {showUnmuteHint ? (
+              <button
+                type="button"
+                className="landing-video-unmute-hit"
+                onClick={enableSound}
+                aria-label="Tap for sound"
+              >
+                <span className="landing-video-unmute-btn">Tap for sound</span>
               </button>
             ) : null}
           </>
@@ -1954,14 +2050,15 @@ function HomePage({ content }) {
         )}
 
         <div className="products-grid">
-          {(content.home.demoCards || []).map((card) => (
-            <DemoCard
-              key={card.id || card._id || card.title}
-              card={card}
-              variant="product"
-              whatsappNumber={content.siteSettings.whatsappNumber}
-              whatsappFallback={siteChrome.whatsappCta}
-            />
+          {(content.home.demoCards || []).map((card, index) => (
+            <div key={card.id || card._id || card.title} data-animate={sideInAttr(index)}>
+              <DemoCard
+                card={card}
+                variant="product"
+                whatsappNumber={content.siteSettings.whatsappNumber}
+                whatsappFallback={siteChrome.whatsappCta}
+              />
+            </div>
           ))}
         </div>
       </section>
