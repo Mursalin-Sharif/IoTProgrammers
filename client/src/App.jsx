@@ -2,8 +2,6 @@ import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Swiper, SwiperSlide } from 'swiper/react'
-import { Autoplay, Navigation, Pagination } from 'swiper/modules'
 import {
   ChevronDown,
   ChevronLeft,
@@ -35,10 +33,8 @@ import {
   Video,
   X,
 } from 'lucide-react'
-import 'swiper/css'
-import 'swiper/css/navigation'
-import 'swiper/css/pagination'
 import reviewsPageDefaults from './reviewsPageDefaults.js'
+import { useAppSwiper } from './components/useAppSwiper.js'
 import contactPageDefaults, { BUSINESS_ADDRESS } from './contactPageDefaults.js'
 import pricingDefaults, { landingPricingDefaults } from './pricingDefaults.js'
 import { landingComparisonDefaults, homeComparisonDefaults } from './comparisonDefaults.js'
@@ -159,6 +155,46 @@ const withResolvedMedia = (item) => {
 }
 
 const DEFAULT_LOGO_URL = '/logo-iotprogrammers.png'
+const DEFAULT_LOGO_WEBP_URL = '/logo-iotprogrammers.webp'
+
+function BrandLogoImage({ src, className, width = 40, height = 40, eager = false }) {
+  const resolved = resolveMediaUrl(src)
+  const useDefaultWebp =
+    !src ||
+    src === DEFAULT_LOGO_URL ||
+    /\/logo-iotprogrammers\.(png|jpg|jpeg|webp)$/i.test(String(src))
+
+  if (useDefaultWebp) {
+    return (
+      <picture>
+        <source srcSet={DEFAULT_LOGO_WEBP_URL} type="image/webp" />
+        <img
+          src={DEFAULT_LOGO_URL}
+          alt=""
+          className={className}
+          width={width}
+          height={height}
+          decoding="async"
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : 'low'}
+        />
+      </picture>
+    )
+  }
+
+  return (
+    <img
+      src={resolved}
+      alt=""
+      className={className}
+      width={width}
+      height={height}
+      decoding="async"
+      loading={eager ? 'eager' : 'lazy'}
+      fetchPriority={eager ? 'high' : 'auto'}
+    />
+  )
+}
 
 const fallbackContent = {
   siteSettings: {
@@ -864,7 +900,7 @@ function SiteHeader({ content, variant = 'dark' }) {
         <div className="site-header-inner">
           <NavLink to="/" className="brand-lockup" onClick={closeMenu} aria-label={brandLabel}>
             {logoUrl ? (
-              <img src={logoUrl} alt="" className="brand-logo-img" />
+              <BrandLogoImage src={logoUrl} className="brand-logo-img" width={36} height={36} eager />
             ) : (
               <div className="brand-logo">{settings.logoText || 'IP'}</div>
             )}
@@ -970,7 +1006,16 @@ function BottomNav() {
           aria-label={bottomNavHomeItem.label}
         >
           <span className="bottom-nav-center-bump" aria-hidden="true" />
-          <img src="/assets/home-button.gif" alt="" className="bottom-nav-center-img" />
+          <img
+            src="/assets/home-button.min.gif"
+            alt=""
+            className="bottom-nav-center-img"
+            width={72}
+            height={72}
+            decoding="async"
+            loading="lazy"
+            fetchPriority="low"
+          />
         </NavLink>
 
         {bottomNavSideItems.slice(2).map(renderBottomNavLink)}
@@ -1058,7 +1103,7 @@ function SiteFooter({ content }) {
         <div className="site-footer-brand">
           <div className="site-footer-brand-lockup">
             {logoUrl ? (
-              <img src={logoUrl} alt="" className="site-footer-logo" />
+              <BrandLogoImage src={logoUrl} className="site-footer-logo" width={48} height={48} />
             ) : null}
             <h3 className="site-footer-brand-name">{brandLabel}</h3>
           </div>
@@ -1230,7 +1275,7 @@ function LandingIntroSection({ content }) {
                 loop
                 playsInline
                 controls
-                preload="auto"
+                preload="metadata"
               />
             ) : iframeSrc ? (
               <iframe
@@ -1331,7 +1376,6 @@ function CardVideoMedia({
   const resolvedVideoUrl = resolveMediaUrl(videoUrl)
   const resolvedThumb = resolveMediaUrl(thumbnailUrl)
   const lightboxUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: false })
-  const warmUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: false, muted: true })
   const hotMutedUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: true })
   const isFileVideo = isDirectVideoFile(resolvedVideoUrl)
   const canPlay = Boolean(resolvedVideoUrl)
@@ -1348,30 +1392,8 @@ function CardVideoMedia({
 
   useExclusiveVideo(playerId, stopPlayback)
 
-  // Warm the YouTube player behind the thumbnail (no autoplay) so one tap can play+unmute.
-  useEffect(() => {
-    if (isFileVideo || !canPlay || !warmUrl) return undefined
-    const node = rootRef.current
-    if (!node || typeof IntersectionObserver === 'undefined') return undefined
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return
-        if (preloadedRef.current || playing) return
-        const iframe = iframeRef.current
-        if (!iframe) return
-        iframe.src = warmUrl
-        setPlayerSrc(warmUrl)
-        preloadedRef.current = true
-        listenYoutubePlayer(iframe)
-      },
-      { rootMargin: '220px 0px', threshold: 0.05 },
-    )
-
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [canPlay, isFileVideo, warmUrl, playing])
-
+  // Do not warm YouTube iframes in the background — that tanks mobile LCP/bandwidth.
+  // Playback still starts on the first tap via hotMutedUrl below.
   const startInlinePlay = useCallback(
     (event) => {
       event?.preventDefault?.()
@@ -1456,7 +1478,14 @@ function CardVideoMedia({
               disabled={!canPlay}
               aria-label={canPlay ? `Play ${title}` : 'Add a video URL in admin to play'}
             >
-              <img src={resolvedThumb} alt={thumbnailAlt || title} />
+              <img
+                src={resolvedThumb}
+                alt={thumbnailAlt || title}
+                width={640}
+                height={360}
+                decoding="async"
+                loading="lazy"
+              />
               {discountBadge && <span className="product-discount">{discountBadge}</span>}
               {canPlay && (
                 <span className="video-play-fab" aria-hidden="true">
@@ -1492,7 +1521,14 @@ function CardVideoMedia({
                 disabled={!canPlay}
                 aria-label={canPlay ? `Play ${title}` : 'Add a YouTube video URL in admin to play'}
               >
-                <img src={resolvedThumb} alt={thumbnailAlt || title} />
+                <img
+                  src={resolvedThumb}
+                  alt={thumbnailAlt || title}
+                  width={640}
+                  height={360}
+                  decoding="async"
+                  loading="lazy"
+                />
                 {discountBadge && <span className="product-discount">{discountBadge}</span>}
                 {canPlay && (
                   <span className="video-play-fab" aria-hidden="true">
@@ -1645,7 +1681,14 @@ function GalleryCard({ item, whatsappNumber, liveDemoLabel = siteChrome.liveDemo
           </div>
         )
       ) : (
-        <img src={media.imageUrl || media.thumbnailUrl || thumbnail} alt={media.title || 'Gallery image'} />
+        <img
+          src={media.imageUrl || media.thumbnailUrl || thumbnail}
+          alt={media.title || 'Gallery image'}
+          width={640}
+          height={360}
+          decoding="async"
+          loading="lazy"
+        />
       )}
 
       <div className="gallery-card-body product-body">
@@ -1859,11 +1902,18 @@ function PricingCompareSection({ pricing: pricingProp, defaults = pricingDefault
 
 function LandingPage({ content }) {
   const rootRef = useRef(null)
+  const swiperMod = useAppSwiper()
   const pageReviews = getPageReviews(content, 'landing')
   const landingDemoCards = content.landing?.demoCards || []
   const galleryItems = content.landing?.gallery || []
 
   useScrollSideIn(rootRef, [content.landing, pageReviews.length])
+
+  const Swiper = swiperMod?.Swiper
+  const SwiperSlide = swiperMod?.SwiperSlide
+  const Autoplay = swiperMod?.Autoplay
+  const Navigation = swiperMod?.Navigation
+  const Pagination = swiperMod?.Pagination
 
   return (
     <div ref={rootRef} className="page-stack landing-page">
@@ -1898,6 +1948,7 @@ function LandingPage({ content }) {
             <ChevronLeft size={20} />
           </button>
 
+          {Swiper && SwiperSlide ? (
           <Swiper
             modules={[Navigation, Pagination, Autoplay]}
             className="reviews-swiper"
@@ -1935,6 +1986,20 @@ function LandingPage({ content }) {
               </SwiperSlide>
             ))}
           </Swiper>
+          ) : (
+            <div className="reviews-swiper reviews-swiper-fallback">
+              {(pageReviews.slice(0, 1) || []).map((review) => (
+                <article key={review._id || review.title} className="review-card">
+                  <div className="stars">{'★'.repeat(review.rating || 5)}</div>
+                  <p className="review-quote">"{review.description?.replace(/\*\*/g, '')}"</p>
+                  <div className="review-author">
+                    <h3>{review.title}</h3>
+                    <span>{review.subtitle}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
 
           <button type="button" className="feature-arrow feature-arrow-next reviews-next" aria-label="পরের রিভিউ">
             <ChevronRight size={20} />
@@ -1977,66 +2042,91 @@ function LandingPage({ content }) {
 
 function HomePage({ content }) {
   const rootRef = useRef(null)
+  const swiperMod = useAppSwiper()
   const contactPage = { ...contactPageDefaults, ...content.contact }
   const phone = contactPage.phone || content.siteSettings.contactPhone || '01302003306'
   const whatsappNumber = contactPage.whatsappNumber || content.siteSettings.whatsappNumber || phone
   const telHref = `tel:${String(phone).replace(/\s/g, '')}`
+  const Swiper = swiperMod?.Swiper
+  const SwiperSlide = swiperMod?.SwiperSlide
+  const Autoplay = swiperMod?.Autoplay
+  const Navigation = swiperMod?.Navigation
+  const Pagination = swiperMod?.Pagination
+  const heroSlides = content.home.heroSlides || []
+  const featureCards = content.home.featureCards || []
 
   useScrollSideIn(rootRef, [content.home, content.pricing])
+
+  const renderHeroSlide = (slide, imagePriority = 'auto') => (
+    <article className="hero-banner-slide">
+      <img
+        src={resolveMediaUrl(slide.imageUrl)}
+        alt={slide.title}
+        className="hero-banner-bg"
+        width={1200}
+        height={420}
+        decoding="async"
+        loading={imagePriority === 'high' ? 'eager' : 'lazy'}
+        fetchPriority={imagePriority}
+      />
+      <div className="hero-banner-overlay" aria-hidden="true" />
+      <div className="hero-banner-content">
+        {slide.badge && <span className="hero-banner-badge">{slide.badge}</span>}
+        <h2 className="hero-banner-title">{slide.title}</h2>
+        {slide.subtitle && <p className="hero-banner-subtitle">{slide.subtitle}</p>}
+        {slide.ctaText && (() => {
+          const fallbackHref = getWhatsappLink(whatsappNumber)
+          const rawHref = slide.ctaLink || fallbackHref
+          const isWaCta = isWhatsappLink(rawHref) || isWhatsappCtaText(slide.ctaText)
+          const ctaHref = isWaCta && !isWhatsappLink(rawHref) ? fallbackHref : rawHref
+          const opensExternal = /^https?:\/\//i.test(ctaHref)
+
+          return (
+            <a
+              href={ctaHref}
+              className={`hero-banner-cta${isWaCta ? ' whatsapp-btn' : ''}`}
+              target={opensExternal ? '_blank' : undefined}
+              rel={opensExternal ? 'noreferrer' : undefined}
+              onClick={(event) => {
+                if (!isWaCta) return
+                trackContact(
+                  {
+                    content_name: slide.title || 'Hero WhatsApp CTA',
+                    lead_source: 'home_hero_cta',
+                  },
+                  event.currentTarget,
+                )
+              }}
+            >
+              {slide.ctaText}
+            </a>
+          )
+        })()}
+      </div>
+    </article>
+  )
 
   return (
     <div ref={rootRef} className="page-stack home-page">
       <section className="hero-banner-section section-blend">
-        <Swiper
-          modules={[Autoplay, Pagination]}
-          slidesPerView={1}
-          loop={content.home.heroSlides.length > 1}
-          autoplay={{ delay: 4000, disableOnInteraction: false }}
-          pagination={{ clickable: true }}
-          className="hero-banner-swiper"
-        >
-          {content.home.heroSlides.map((slide) => (
-            <SwiperSlide key={slide._id || slide.title}>
-              <article className="hero-banner-slide">
-                <img src={resolveMediaUrl(slide.imageUrl)} alt={slide.title} className="hero-banner-bg" />
-                <div className="hero-banner-overlay" aria-hidden="true" />
-                <div className="hero-banner-content">
-                  {slide.badge && <span className="hero-banner-badge">{slide.badge}</span>}
-                  <h2 className="hero-banner-title">{slide.title}</h2>
-                  {slide.subtitle && <p className="hero-banner-subtitle">{slide.subtitle}</p>}
-                  {slide.ctaText && (() => {
-                    const fallbackHref = getWhatsappLink(whatsappNumber)
-                    const rawHref = slide.ctaLink || fallbackHref
-                    const isWaCta = isWhatsappLink(rawHref) || isWhatsappCtaText(slide.ctaText)
-                    const ctaHref = isWaCta && !isWhatsappLink(rawHref) ? fallbackHref : rawHref
-                    const opensExternal = /^https?:\/\//i.test(ctaHref)
-
-                    return (
-                      <a
-                        href={ctaHref}
-                        className={`hero-banner-cta${isWaCta ? ' whatsapp-btn' : ''}`}
-                        target={opensExternal ? '_blank' : undefined}
-                        rel={opensExternal ? 'noreferrer' : undefined}
-                        onClick={(event) => {
-                          if (!isWaCta) return
-                          trackContact(
-                            {
-                              content_name: slide.title || 'Hero WhatsApp CTA',
-                              lead_source: 'home_hero_cta',
-                            },
-                            event.currentTarget,
-                          )
-                        }}
-                      >
-                        {slide.ctaText}
-                      </a>
-                    )
-                  })()}
-                </div>
-              </article>
-            </SwiperSlide>
-          ))}
-        </Swiper>
+        {Swiper && SwiperSlide ? (
+          <Swiper
+            modules={[Autoplay, Pagination]}
+            slidesPerView={1}
+            loop={heroSlides.length > 1}
+            autoplay={{ delay: 4000, disableOnInteraction: false }}
+            pagination={{ clickable: true }}
+            className="hero-banner-swiper"
+          >
+            {heroSlides.map((slide, index) => (
+              <SwiperSlide key={slide._id || slide.title}>
+                {renderHeroSlide(slide, index === 0 ? 'high' : 'low')}
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        ) : heroSlides[0] ? (
+          <div className="hero-banner-swiper hero-banner-fallback">{renderHeroSlide(heroSlides[0], 'high')}</div>
+        ) : null}
       </section>
 
       <section className="feature-section section-blend section-blend--carousel">
@@ -2045,36 +2135,53 @@ function HomePage({ content }) {
             <ChevronLeft size={20} />
           </button>
 
-          <Swiper
-            modules={[Navigation, Pagination, Autoplay]}
-            slidesPerView={1.2}
-            spaceBetween={14}
-            loop={(content.home.featureCards || []).length > 2}
-            autoplay={{ delay: 3200, disableOnInteraction: false }}
-            navigation={{
-              prevEl: '.feature-arrow-prev',
-              nextEl: '.feature-arrow-next',
-            }}
-            pagination={{ clickable: true }}
-            watchOverflow
-            className="feature-swiper"
-          >
-            {(content.home.featureCards || []).map((card) => {
-              const Icon = featureIconMap[card.icon] || ShieldCheck
+          {Swiper && SwiperSlide ? (
+            <Swiper
+              modules={[Navigation, Pagination, Autoplay]}
+              slidesPerView={1.2}
+              spaceBetween={14}
+              loop={featureCards.length > 2}
+              autoplay={{ delay: 3200, disableOnInteraction: false }}
+              navigation={{
+                prevEl: '.feature-arrow-prev',
+                nextEl: '.feature-arrow-next',
+              }}
+              pagination={{ clickable: true }}
+              watchOverflow
+              className="feature-swiper"
+            >
+              {featureCards.map((card) => {
+                const Icon = featureIconMap[card.icon] || ShieldCheck
 
-              return (
-                <SwiperSlide key={card._id || card.title}>
-                  <article className="feature-card">
+                return (
+                  <SwiperSlide key={card._id || card.title}>
+                    <article className="feature-card">
+                      <div className="feature-card-icon">
+                        <Icon size={34} strokeWidth={1.75} />
+                      </div>
+                      <h3>{card.title}</h3>
+                      <p>{card.description}</p>
+                    </article>
+                  </SwiperSlide>
+                )
+              })}
+            </Swiper>
+          ) : (
+            <div className="feature-swiper feature-swiper-fallback">
+              {featureCards.slice(0, 1).map((card) => {
+                const Icon = featureIconMap[card.icon] || ShieldCheck
+                return (
+                  <article key={card._id || card.title} className="feature-card">
                     <div className="feature-card-icon">
                       <Icon size={34} strokeWidth={1.75} />
                     </div>
                     <h3>{card.title}</h3>
                     <p>{card.description}</p>
                   </article>
-                </SwiperSlide>
-              )
-            })}
-          </Swiper>
+                )
+              })}
+            </div>
+          )}
 
           <button type="button" className="feature-arrow feature-arrow-next" aria-label="Next features">
             <ChevronRight size={20} />
@@ -2082,7 +2189,7 @@ function HomePage({ content }) {
         </div>
 
         <div className="feature-grid">
-          {(content.home.featureCards || []).map((card, index) => {
+          {featureCards.map((card, index) => {
             const Icon = featureIconMap[card.icon] || ShieldCheck
 
             return (

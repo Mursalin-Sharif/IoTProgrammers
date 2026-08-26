@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const compression = require('compression');
 const dotenv = require('dotenv');
 const { reviewsPageDefaults } = require('./reviewsPageDefaults');
 const { pricingDefaults, landingPricingDefaults } = require('./pricingDefaults');
@@ -72,8 +73,20 @@ const corsOptions = CLIENT_ORIGIN
   : undefined;
 
 app.use(corsOptions ? cors(corsOptions) : cors());
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
-app.use('/uploads', express.static(uploadsDir));
+app.use(
+  '/uploads',
+  express.static(uploadsDir, {
+    maxAge: '7d',
+    etag: true,
+    setHeaders(res, filePath) {
+      if (/\.(jpe?g|png|gif|webp|avif|mp4|webm|svg)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+      }
+    },
+  }),
+);
 
 const mediaItemSchema = new mongoose.Schema(
   {
@@ -954,10 +967,35 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // Production: serve Vite build from Express (Hostinger single Node app)
 if (fs.existsSync(clientDistDir)) {
-  app.use(express.static(clientDistDir, { index: false, maxAge: '1h' }));
+  app.use(
+    express.static(clientDistDir, {
+      index: false,
+      etag: true,
+      setHeaders(res, filePath) {
+        const base = path.basename(filePath);
+        // HTML must revalidate so Redeploy picks up new asset hashes.
+        if (base === 'index.html' || filePath.endsWith(`${path.sep}index.html`)) {
+          res.setHeader('Cache-Control', 'no-cache');
+          return;
+        }
+        // Vite hashed bundles under /assets/
+        if (filePath.includes(`${path.sep}assets${path.sep}`) && /\.[a-f0-9]{8,}\./i.test(base)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          return;
+        }
+        // Static public images (logo, nav gif, favicon)
+        if (/\.(js|css|woff2?|svg|webp|png|jpe?g|gif|ico)$/i.test(base)) {
+          res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+          return;
+        }
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      },
+    }),
+  );
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     return res.sendFile(path.join(clientDistDir, 'index.html'), (err) => {
       if (err) next(err);
     });

@@ -1044,6 +1044,14 @@ body.contact-route-body {
 .hero-banner-swiper,
 .hero-banner-slide {
   height: 210px;
+  contain: layout paint;
+}
+
+.hero-banner-fallback,
+.feature-swiper-fallback,
+.reviews-swiper-fallback {
+  width: 100%;
+  min-height: 210px;
 }
 
 .hero-banner-slide {
