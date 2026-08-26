@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { Swiper, SwiperSlide } from 'swiper/react'
@@ -1107,7 +1107,7 @@ function LandingIntroSection({ content }) {
   const iframeRef = useRef(null)
   const playerId = useId()
   const videoRef = useRef(null)
-  const startedRef = useRef(false)
+  const soundLockRef = useRef(false)
   const [introActive, setIntroActive] = useState(true)
   const [inView, setInView] = useState(false)
   const [iframeSrc, setIframeSrc] = useState('')
@@ -1115,6 +1115,7 @@ function LandingIntroSection({ content }) {
   const [isTouchUi, setIsTouchUi] = useState(null)
   const introVideoUrl = resolveMediaUrl(content.landing?.introVideoUrl?.trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
+  const posterUrl = introVideoUrl && !isFileVideo ? getYoutubeThumbnail(introVideoUrl) : ''
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText])
 
@@ -1136,17 +1137,10 @@ function LandingIntroSection({ content }) {
   useExclusiveVideo(playerId, () => {
     videoRef.current?.pause()
     stopYoutubePlayer(iframeRef.current)
-    startedRef.current = false
+    soundLockRef.current = false
     setSoundOn(false)
+    setIframeSrc('')
     setIntroActive(true)
-    // Keep muted embed ready so next tap only unmutes.
-    if (introVideoUrl && !isFileVideo) {
-      const mutedSrc = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
-      setIframeSrc(mutedSrc)
-      if (iframeRef.current) iframeRef.current.src = mutedSrc
-    } else {
-      setIframeSrc('')
-    }
   })
 
   useEffect(() => {
@@ -1159,87 +1153,87 @@ function LandingIntroSection({ content }) {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.1) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.08) {
             setInView(true)
           }
         })
       },
-      { threshold: [0.1, 0.25], rootMargin: '160px 0px' },
+      { threshold: [0.08, 0.2], rootMargin: '180px 0px' },
     )
 
     observer.observe(node)
     return () => observer.disconnect()
   }, [introVideoUrl])
 
-  // Mobile: muted autoplay when visible (always allowed). One tap only unmutes.
-  // Desktop: unmuted autoplay.
+  // Desktop: unmuted autoplay when visible.
+  // Mobile: wait for tap — mounting unmuted embed outside a gesture never gets sound.
   useEffect(() => {
-    if (!introVideoUrl || isFileVideo || !introActive || !inView || isTouchUi === null) {
-      return undefined
-    }
-    if (soundOn) return undefined
+    if (!introVideoUrl || isFileVideo || !introActive || !inView || isTouchUi === null) return undefined
+    if (isTouchUi || soundLockRef.current) return undefined
 
-    const muted = Boolean(isTouchUi)
-    const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted })
+    const src = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
     setIframeSrc(src)
-
-    if (!isTouchUi) {
-      startedRef.current = true
-      setSoundOn(true)
-      requestExclusiveVideoPlay(playerId)
-    }
-
+    soundLockRef.current = true
+    setSoundOn(true)
+    requestExclusiveVideoPlay(playerId)
     return undefined
-  }, [introVideoUrl, isFileVideo, introActive, inView, playerId, isTouchUi, soundOn])
+  }, [introVideoUrl, isFileVideo, introActive, inView, playerId, isTouchUi])
 
   useEffect(() => {
     if (!isFileVideo || !videoRef.current || !introActive || !inView || isTouchUi === null) {
       return undefined
     }
+    if (isTouchUi && !soundOn) return undefined
 
     const video = videoRef.current
-    const startMuted = Boolean(isTouchUi) && !soundOn
-    video.muted = startMuted
+    video.muted = false
     video.volume = 1
     video.playsInline = true
     video.play()?.catch?.(() => {})
-    if (!isTouchUi) {
-      startedRef.current = true
-      setSoundOn(true)
-    }
+    soundLockRef.current = true
+    setSoundOn(true)
     return undefined
   }, [isFileVideo, introVideoUrl, introActive, inView, isTouchUi, soundOn])
 
   const enableSound = (event) => {
     event?.preventDefault?.()
     event?.stopPropagation?.()
-    if (soundOn && startedRef.current) return
+    if (soundLockRef.current && soundOn) return
+    if (!introVideoUrl) return
 
-    startedRef.current = true
-    setSoundOn(true)
-    setIntroActive(true)
+    soundLockRef.current = true
     requestExclusiveVideoPlay(playerId)
 
-    if (isFileVideo && videoRef.current) {
-      videoRef.current.muted = false
-      videoRef.current.volume = 1
-      videoRef.current.play()?.catch?.(() => {})
+    if (isFileVideo) {
+      setSoundOn(true)
+      setIntroActive(true)
+      const video = videoRef.current
+      if (video) {
+        video.muted = false
+        video.volume = 1
+        video.play()?.catch?.(() => {})
+      }
       return
     }
 
+    const withSound = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
+
+    // Commit iframe into the DOM inside this gesture, then set src again on the real node.
+    flushSync(() => {
+      setIntroActive(true)
+      setSoundOn(true)
+      setIframeSrc(withSound)
+    })
+
     const iframe = iframeRef.current
-    // Player should already be muted-autoplaying — unmute inside this tap.
-    if (iframe && introVideoUrl) {
-      const mutedSrc = getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
-      if (!iframe.src || iframe.src === 'about:blank' || iframe.src.includes('mute=0')) {
-        iframe.src = mutedSrc
-        setIframeSrc(mutedSrc)
-      }
-      unmuteYoutubePlayer(iframe)
+    if (iframe) {
+      iframe.src = withSound
+      unmuteYoutubePlayerOnce(iframe)
     }
   }
 
   const needsSoundTap = Boolean(introVideoUrl && isTouchUi === true && !soundOn && introActive)
+  const showIframe = Boolean(introVideoUrl && !isFileVideo && (isTouchUi === false || soundOn) && iframeSrc)
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
@@ -1251,35 +1245,37 @@ function LandingIntroSection({ content }) {
                 ref={videoRef}
                 className="landing-video-player"
                 src={introVideoUrl}
-                autoPlay={introActive && inView}
-                muted={Boolean(isTouchUi) && !soundOn}
+                autoPlay={introActive && inView && soundOn}
+                muted={false}
                 loop
                 playsInline
                 controls
                 preload="auto"
               />
-            ) : (
+            ) : showIframe ? (
               <iframe
                 ref={iframeRef}
                 className="landing-video-frame"
-                src={iframeSrc || undefined}
+                src={iframeSrc}
                 title="Landing intro video"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
                 loading="eager"
                 referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => {
-                  if (soundOn) unmuteYoutubePlayerOnce(iframeRef.current)
-                  else listenYoutubePlayer(iframeRef.current)
-                }}
               />
+            ) : posterUrl ? (
+              <img className="landing-video-poster" src={posterUrl} alt="" />
+            ) : (
+              <div className="landing-video-placeholder">
+                <p>Loading video…</p>
+              </div>
             )}
 
             {needsSoundTap ? (
               <button
                 type="button"
                 className="landing-video-sound-play"
-                onClick={enableSound}
+                onPointerDown={enableSound}
                 aria-label="Tap for sound"
               >
                 <span className="landing-video-sound-play-icon" aria-hidden="true" />

@@ -85,7 +85,8 @@ iframe {
   max-width: none;
   margin: 0;
   padding-top: 3.75rem;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* Footer owns bottom-nav clearance — avoid empty scroll under the page. */
+  padding-bottom: 0;
 }
 
 /* Full-bleed page backgrounds (no side gutters) */
@@ -488,7 +489,8 @@ body.reviews-route-body {
   max-width: none;
   margin: 0;
   padding-top: 3.75rem;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* No footer on reviews — keep clearance for fixed bottom nav only. */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
 .reviews-route .reviews-page-shell {
@@ -514,7 +516,7 @@ body.contact-route-body {
   max-width: none;
   margin: 0;
   padding-top: 3.75rem;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 0;
 }
 
 .contact-route .contact-page-shell {
@@ -718,7 +720,7 @@ body.contact-route-body {
 }
 
 .site-footer-bottom {
-  padding: 14px 16px calc(70px + env(safe-area-inset-bottom, 0px));
+  padding: 14px 16px calc(58px + env(safe-area-inset-bottom, 0px));
   background: var(--footer-bg-bottom);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   text-align: center;
@@ -3413,10 +3415,6 @@ button.product-demo-link {
   .floating-whatsapp {
     right: 20px;
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .app-shell {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 }
 
