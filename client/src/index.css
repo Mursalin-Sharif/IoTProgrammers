@@ -1499,6 +1499,18 @@ body.contact-route-body {
   background: #000;
 }
 
+.card-inline-frame.is-armed {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.card-video-media.is-playing .card-inline-frame {
+  z-index: 1;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .product-media .thumbnail-button {
   position: absolute;
   inset: 0;

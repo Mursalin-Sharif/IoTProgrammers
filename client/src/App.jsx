@@ -524,15 +524,18 @@ const requestExclusiveVideoPlay = (playerId) => {
 }
 
 const useExclusiveVideo = (playerId, onForeignPlay) => {
+  const onForeignPlayRef = useRef(onForeignPlay)
+  onForeignPlayRef.current = onForeignPlay
+
   useEffect(() => {
     const handlePlay = (event) => {
       if (event.detail?.playerId === playerId) return
-      onForeignPlay()
+      onForeignPlayRef.current?.()
     }
 
     window.addEventListener(VIDEO_PLAY_EVENT, handlePlay)
     return () => window.removeEventListener(VIDEO_PLAY_EVENT, handlePlay)
-  }, [playerId, onForeignPlay])
+  }, [playerId])
 }
 
 const getYoutubeThumbnail = (url) => {
@@ -1105,11 +1108,14 @@ function LandingIntroSection({ content }) {
   }, [])
 
   useExclusiveVideo(playerId, () => {
-    setIntroActive(false)
     videoRef.current?.pause()
-    setIframeSrc('')
+    postYoutubeCommand(iframeRef.current, 'pauseVideo')
+    postYoutubeCommand(iframeRef.current, 'stopVideo')
+    if (iframeRef.current) iframeRef.current.src = 'about:blank'
+    setIframeSrc(isTouchUi ? 'about:blank' : '')
     startedRef.current = false
     setSoundOn(false)
+    setIntroActive(true)
   })
 
   useEffect(() => {
@@ -1334,25 +1340,75 @@ function CardVideoMedia({
 }) {
   const playerId = useId()
   const videoRef = useRef(null)
+  const iframeRef = useRef(null)
+  const startingRef = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [playerSrc, setPlayerSrc] = useState('')
   const resolvedVideoUrl = resolveMediaUrl(videoUrl)
   const resolvedThumb = resolveMediaUrl(thumbnailUrl)
-  const playableUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: false })
-  const inlinePlayableUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: false })
+  const lightboxUrl = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: false })
   const isFileVideo = isDirectVideoFile(resolvedVideoUrl)
+  const canPlay = Boolean(resolvedVideoUrl)
 
-  useExclusiveVideo(playerId, () => {
+  const stopPlayback = useCallback(() => {
+    startingRef.current = false
     setPlaying(false)
     setExpanded(false)
+    setPlayerSrc('')
     videoRef.current?.pause()
-  })
+    const iframe = iframeRef.current
+    if (iframe) {
+      postYoutubeCommand(iframe, 'pauseVideo')
+      postYoutubeCommand(iframe, 'stopVideo')
+      iframe.src = 'about:blank'
+    }
+  }, [])
 
-  const startInlinePlay = useCallback(() => {
-    if (!inlinePlayableUrl) return
-    requestExclusiveVideoPlay(playerId)
-    setPlaying(true)
-  }, [inlinePlayableUrl, playerId])
+  useExclusiveVideo(playerId, stopPlayback)
+
+  const startInlinePlay = useCallback(
+    (event) => {
+      event?.preventDefault?.()
+      event?.stopPropagation?.()
+      if (!canPlay || startingRef.current) return
+      startingRef.current = true
+
+      requestExclusiveVideoPlay(playerId)
+
+      if (isFileVideo) {
+        setPlaying(true)
+        window.setTimeout(() => {
+          const video = videoRef.current
+          if (!video) {
+            startingRef.current = false
+            return
+          }
+          video.muted = false
+          video.volume = 1
+          video.playsInline = true
+          video.play()?.catch?.(() => {
+            video.muted = true
+            video.play()?.catch?.(() => {})
+          })
+          startingRef.current = false
+        }, 0)
+        return
+      }
+
+      // One tap: assign unmuted autoplay src inside the user gesture on a
+      // pre-mounted iframe so mobile does not need a second YouTube tap.
+      const src = getPlayableVideoUrl(resolvedVideoUrl, { autoplay: true, muted: false })
+      setPlaying(true)
+      setPlayerSrc(src)
+      const iframe = iframeRef.current
+      if (iframe) {
+        iframe.src = src
+      }
+      startingRef.current = false
+    },
+    [canPlay, isFileVideo, playerId, resolvedVideoUrl],
+  )
 
   useEffect(() => {
     onPlayReady?.(startInlinePlay)
@@ -1361,71 +1417,107 @@ function CardVideoMedia({
   return (
     <>
       <div className={`${mediaClassName} card-video-media${playing ? ' is-playing' : ''}`}>
-        {playing && inlinePlayableUrl ? (
-          <>
-            {isFileVideo ? (
-              <div className="card-inline-frame">
-                <video
-                  ref={videoRef}
-                  className="card-inline-video"
-                  src={inlinePlayableUrl}
-                  title={title}
-                  controls
-                  autoPlay
-                  playsInline
-                  onPlay={() => requestExclusiveVideoPlay(playerId)}
-                />
-              </div>
-            ) : (
-              <div className="card-inline-frame">
-                <iframe
-                  className="card-inline-video"
-                  src={inlinePlayableUrl}
-                  title={title || 'Demo video'}
-                  width="100%"
-                  height="100%"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              </div>
-            )}
+        {isFileVideo ? (
+          playing ? (
+            <div className="card-inline-frame">
+              <video
+                ref={videoRef}
+                className="card-inline-video"
+                src={resolvedVideoUrl}
+                title={title}
+                controls
+                autoPlay
+                playsInline
+                onPlay={() => requestExclusiveVideoPlay(playerId)}
+              />
+            </div>
+          ) : (
             <button
               type="button"
-              className="card-video-expand"
-              onClick={() => {
-                requestExclusiveVideoPlay(playerId)
-                setExpanded(true)
-              }}
-              aria-label={`Expand ${title}`}
+              className={`thumbnail-button ${thumbnailClassName}`.trim()}
+              onClick={startInlinePlay}
+              disabled={!canPlay}
+              aria-label={canPlay ? `Play ${title}` : 'Add a video URL in admin to play'}
             >
-              <Maximize2 size={18} />
+              <img src={resolvedThumb} alt={thumbnailAlt || title} />
+              {discountBadge && <span className="product-discount">{discountBadge}</span>}
+              {canPlay && (
+                <span className="video-play-fab" aria-hidden="true">
+                  <span className="video-play-fab-inner">
+                    <Play size={28} fill="currentColor" strokeWidth={0} />
+                  </span>
+                </span>
+              )}
             </button>
-          </>
+          )
         ) : (
+          <>
+            <div className={`card-inline-frame${playing ? '' : ' is-armed'}`} aria-hidden={!playing}>
+              <iframe
+                ref={iframeRef}
+                className="card-inline-video"
+                src={playerSrc || 'about:blank'}
+                title={title || 'Demo video'}
+                width="100%"
+                height="100%"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            </div>
+
+            {!playing ? (
+              <button
+                type="button"
+                className={`thumbnail-button ${thumbnailClassName}`.trim()}
+                onClick={startInlinePlay}
+                disabled={!canPlay}
+                aria-label={canPlay ? `Play ${title}` : 'Add a YouTube video URL in admin to play'}
+              >
+                <img src={resolvedThumb} alt={thumbnailAlt || title} />
+                {discountBadge && <span className="product-discount">{discountBadge}</span>}
+                {canPlay && (
+                  <span className="video-play-fab" aria-hidden="true">
+                    <span className="video-play-fab-inner">
+                      <Play size={28} fill="currentColor" strokeWidth={0} />
+                    </span>
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="card-video-expand"
+                onClick={() => {
+                  requestExclusiveVideoPlay(playerId)
+                  setExpanded(true)
+                }}
+                aria-label={`Expand ${title}`}
+              >
+                <Maximize2 size={18} />
+              </button>
+            )}
+          </>
+        )}
+
+        {isFileVideo && playing ? (
           <button
             type="button"
-            className={`thumbnail-button ${thumbnailClassName}`.trim()}
-            onClick={startInlinePlay}
-            disabled={!inlinePlayableUrl}
-            aria-label={inlinePlayableUrl ? `Play ${title}` : 'Add a YouTube video URL in admin to play'}
+            className="card-video-expand"
+            onClick={() => {
+              requestExclusiveVideoPlay(playerId)
+              setExpanded(true)
+            }}
+            aria-label={`Expand ${title}`}
           >
-            <img src={resolvedThumb} alt={thumbnailAlt || title} />
-            {discountBadge && <span className="product-discount">{discountBadge}</span>}
-            {inlinePlayableUrl && (
-              <span className="video-play-fab" aria-hidden="true">
-                <span className="video-play-fab-inner">
-                  <Play size={28} fill="currentColor" strokeWidth={0} />
-                </span>
-              </span>
-            )}
+            <Maximize2 size={18} />
           </button>
-        )}
+        ) : null}
       </div>
 
       <VideoLightbox
         open={expanded}
-        url={playableUrl}
+        url={lightboxUrl}
         title={title}
         isFile={isFileVideo}
         onClose={() => setExpanded(false)}
