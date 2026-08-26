@@ -1236,16 +1236,17 @@ function LandingIntroSection({ content, contentReady = false }) {
   const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
   const youtubeId = !isFileVideo ? extractYoutubeId(introVideoUrl) : ''
-  // One admin URL only. mute=0 = auto sound when the browser allows it.
+  // Mount only after API is ready so default never starts first and sticks.
   const embedSrc =
     introVideoUrl && !isFileVideo
       ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
       : ''
   const showPlayer = Boolean(contentReady && introVideoUrl && (isFileVideo || embedSrc))
+  const playerKey = isFileVideo ? introVideoUrl : youtubeId || embedSrc
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl, contentReady])
 
-  // Soft pause only — never blank/remount the intro iframe (that caused the “two videos” glitch).
+  // Soft pause only — never blank/remount the intro iframe.
   useExclusiveVideo(playerId, () => {
     videoRef.current?.pause()
     if (iframeRef.current) {
@@ -1277,7 +1278,6 @@ function LandingIntroSection({ content, contentReady = false }) {
       unmuteYoutubePlayer(iframeRef.current)
     }
 
-    // Try unmuted play without touching iframe.src (src stays the single admin URL).
     const timers = [120, 450, 1100].map((ms) => window.setTimeout(armSound, ms))
 
     const onGesture = () => armSound()
@@ -1291,7 +1291,7 @@ function LandingIntroSection({ content, contentReady = false }) {
       window.removeEventListener('touchstart', onGesture, true)
       window.removeEventListener('keydown', onGesture, true)
     }
-  }, [showPlayer, isFileVideo, embedSrc, introVideoUrl, playerId])
+  }, [showPlayer, isFileVideo, playerKey, playerId])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
@@ -1306,7 +1306,7 @@ function LandingIntroSection({ content, contentReady = false }) {
           </div>
         ) : isFileVideo ? (
           <video
-            key={introVideoUrl}
+            key={playerKey}
             ref={videoRef}
             className="landing-video-player"
             src={introVideoUrl}
@@ -1320,7 +1320,7 @@ function LandingIntroSection({ content, contentReady = false }) {
           />
         ) : embedSrc ? (
           <iframe
-            key={youtubeId || embedSrc}
+            key={playerKey}
             ref={iframeRef}
             className="landing-video-frame"
             src={embedSrc}

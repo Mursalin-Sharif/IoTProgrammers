@@ -515,9 +515,9 @@ const ensureContent = async () => {
   const patch = {};
 
   if (!existing.landing?.introVideoUrl) {
-    patch['landing.introVideoUrl'] = defaultContent.landing.introVideoUrl;
+    // Do not inject a sample YouTube URL — admin must set Landing intro video.
   } else if (existing.landing.introVideoUrl.includes('youtube.com/embed/jNQXAC9IVRw')) {
-    patch['landing.introVideoUrl'] = defaultContent.landing.introVideoUrl;
+    patch['landing.introVideoUrl'] = defaultContent.landing.introVideoUrl || '';
   }
   if (!existing.landing?.headline) {
     patch['landing.headline'] = defaultContent.landing.headline;

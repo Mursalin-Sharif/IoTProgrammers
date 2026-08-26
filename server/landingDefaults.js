@@ -4,7 +4,8 @@ const { landingPricingDefaults } = require('./pricingDefaults');
 const landingWhatsappCta = '৫ মিনিট ফ্রি WhatsApp কল — এখনই কথা বলুন';
 
 const landingDefaults = {
-  introVideoUrl: 'https://www.youtube.com/embed/k_TqTcyQsSg',
+  // Empty until admin sets Landing → Intro Video URL (avoids sticky default vs admin mismatch).
+  introVideoUrl: '',
   headline: 'বাংলাদেশি ব্যবসার জন্য প্রফেশনাল MERN পোর্টফোলিও ও ডেমো ওয়েবসাইট',
   featuresText:
     'ল্যান্ডিং পেজ, লাইভ ডেমো কার্ড, ক্লায়েন্ট রিভিউ, ইমেজ-ভিডিও গ্যালারি ও WhatsApp লিড বাটন—সবকিছু অ্যাডমিন ড্যাশবোর্ড থেকে কোড ছাড়াই এডিট করুন। IoTProgrammers বাংলাদেশি এজেন্সি, স্টার্টআপ ও SME-এর জন্য দ্রুত ডেলিভারি ও সাপোর্ট দেয়।',
