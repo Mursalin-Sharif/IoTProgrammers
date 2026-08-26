@@ -797,6 +797,7 @@ const scrollToTop = () => {
 function App() {
   const [content, setContent] = useState(fallbackContent)
   const [loading, setLoading] = useState(false)
+  const [contentReady, setContentReady] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -812,6 +813,7 @@ function App() {
         setError('Backend unavailable. Showing fallback content.')
       } finally {
         setLoading(false)
+        setContentReady(true)
       }
     }
 
@@ -831,9 +833,10 @@ function App() {
       content,
       setContent,
       loading,
+      contentReady,
       error,
     }),
-    [content, loading, error]
+    [content, loading, contentReady, error]
   )
 
   return (
@@ -856,7 +859,7 @@ function App() {
   )
 }
 
-function SiteLayout({ content, loading, error }) {
+function SiteLayout({ content, loading, contentReady, error }) {
   const location = useLocation()
   const isLanding = location.pathname === '/landing'
   const isHome = location.pathname === '/' || location.pathname === '/home'
@@ -891,7 +894,7 @@ function SiteLayout({ content, loading, error }) {
     >
       <GtmSnippets siteSettings={content.siteSettings} />
       <SiteHeader content={content} variant="dark" />
-      {isLanding && <LandingIntroSection content={content} />}
+      {isLanding && <LandingIntroSection content={content} contentReady={contentReady} />}
       <div
         className={`app-shell${isHome ? ' home-shell' : ''}${isLanding ? ' landing-shell' : ''}${isReviews ? ' reviews-shell' : ''}${isContact ? ' contact-shell' : ''}`}
       >
@@ -1223,40 +1226,102 @@ function SiteFooter({ content }) {
   )
 }
 
-function LandingIntroSection({ content }) {
+function LandingIntroSection({ content, contentReady = false }) {
   const rootRef = useRef(null)
+  const iframeRef = useRef(null)
+  const videoRef = useRef(null)
+  const playerId = useId()
+  const soundArmedRef = useRef(false)
+
   const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
-  // One embed URL only — from admin. Muted autoplay avoids reload/unmute glitches.
+  const youtubeId = !isFileVideo ? extractYoutubeId(introVideoUrl) : ''
+  // One admin URL only. mute=0 = auto sound when the browser allows it.
   const embedSrc =
     introVideoUrl && !isFileVideo
-      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true })
+      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
       : ''
+  const showPlayer = Boolean(contentReady && introVideoUrl && (isFileVideo || embedSrc))
 
-  useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl])
+  useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl, contentReady])
+
+  // Soft pause only — never blank/remount the intro iframe (that caused the “two videos” glitch).
+  useExclusiveVideo(playerId, () => {
+    videoRef.current?.pause()
+    if (iframeRef.current) {
+      postYoutubeCommand(iframeRef.current, 'pauseVideo')
+      postYoutubeCommand(iframeRef.current, 'mute')
+    }
+  })
+
+  useEffect(() => {
+    if (!showPlayer) return undefined
+
+    soundArmedRef.current = false
+    requestExclusiveVideoPlay(playerId)
+
+    const armSound = () => {
+      if (soundArmedRef.current) return
+      soundArmedRef.current = true
+      if (isFileVideo) {
+        const video = videoRef.current
+        if (!video) {
+          soundArmedRef.current = false
+          return
+        }
+        video.muted = false
+        video.volume = 1
+        video.play()?.catch?.(() => {})
+        return
+      }
+      unmuteYoutubePlayer(iframeRef.current)
+    }
+
+    // Try unmuted play without touching iframe.src (src stays the single admin URL).
+    const timers = [120, 450, 1100].map((ms) => window.setTimeout(armSound, ms))
+
+    const onGesture = () => armSound()
+    window.addEventListener('pointerdown', onGesture, { once: true, capture: true })
+    window.addEventListener('touchstart', onGesture, { once: true, capture: true })
+    window.addEventListener('keydown', onGesture, { once: true, capture: true })
+
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id))
+      window.removeEventListener('pointerdown', onGesture, true)
+      window.removeEventListener('touchstart', onGesture, true)
+      window.removeEventListener('keydown', onGesture, true)
+    }
+  }, [showPlayer, isFileVideo, embedSrc, introVideoUrl, playerId])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
       <div className="landing-video-wrap">
-        {!introVideoUrl ? (
+        {!contentReady ? (
+          <div className="landing-video-placeholder">
+            <p>Loading video…</p>
+          </div>
+        ) : !introVideoUrl ? (
           <div className="landing-video-placeholder">
             <p>অ্যাডমিন থেকে ল্যান্ডিং ইন্ট্রো ভিডিও যোগ করুন।</p>
           </div>
         ) : isFileVideo ? (
           <video
             key={introVideoUrl}
+            ref={videoRef}
             className="landing-video-player"
             src={introVideoUrl}
             autoPlay
-            muted
+            muted={false}
             loop
             playsInline
             controls
-            preload="metadata"
+            preload="auto"
+            onPlay={() => requestExclusiveVideoPlay(playerId)}
           />
         ) : embedSrc ? (
           <iframe
-            key={embedSrc}
+            key={youtubeId || embedSrc}
+            ref={iframeRef}
             className="landing-video-frame"
             src={embedSrc}
             title="Landing intro video"
@@ -1264,6 +1329,10 @@ function LandingIntroSection({ content }) {
             allowFullScreen
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
+            onLoad={() => {
+              requestExclusiveVideoPlay(playerId)
+              unmuteYoutubePlayerOnce(iframeRef.current)
+            }}
           />
         ) : (
           <div className="landing-video-placeholder">
@@ -3719,7 +3788,7 @@ function AdminPage({ content, setContent, loading }) {
 
               <AdminSection
                 title="Landing Intro"
-                description="শুধু এই Intro Video URL-ই ল্যান্ডিং হিরোতে চলবে — অন্য কোনো ভিডিও লিংক মিক্স হবে না। YouTube (youtu.be / watch / embed) বা MP4 দিন।"
+                description="শুধু এই Intro Video URL-ই হিরোতে চলবে (autoplay + sound)। Fallback/default ভিডিও মিক্স হবে না — Admin যা দিবেন শুধু সেটা।"
               >
                 <FormGrid>
                   <InputField
