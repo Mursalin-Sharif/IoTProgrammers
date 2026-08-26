@@ -15,7 +15,7 @@
   --border: rgba(255, 255, 255, 0.08);
   --text: #dbe6f0;
   --muted: #b4c8dc;
-  --accent: #1cc7b8;
+  --accent: #5eead4;
   --accent-2: #60a5fa;
   --whatsapp: #25d366;
   --whatsapp-hover: #20bd5a;
@@ -409,7 +409,7 @@ section,
 
 .reviews-section-header p {
   margin: 0;
-  color: #7d9a8c;
+  color: #c5e0d4;
   font-size: 0.98rem;
 }
 
@@ -1771,7 +1771,7 @@ body.contact-route-body {
 }
 
 .product-original-price {
-  color: #64748b;
+  color: #475569;
   font-size: 0.88rem;
   text-decoration: line-through;
 }
@@ -1831,7 +1831,7 @@ button.product-demo-link {
 
 .product-video-hint {
   margin: 8px 0 0;
-  color: #64748b;
+  color: #475569;
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -1898,7 +1898,7 @@ button.product-demo-link {
   height: 52px;
   border-radius: 50%;
   background: rgba(28, 199, 184, 0.14);
-  color: #7ef0e4;
+  color: #b8fff5;
 }
 
 .contact-info-card h3 {
@@ -2162,7 +2162,7 @@ button.product-demo-link {
 }
 
 .review-author span {
-  color: #7d9a8c;
+  color: #a8c4b8;
   font-size: 0.88rem;
 }
 

@@ -43,6 +43,7 @@ import homeDefaults, { englishSiteChromeSettings } from './homeDefaults.js'
 import { legalPagesBySlug } from './legalPageContent.js'
 import { bottomNavHomeItem, bottomNavSideItems, navItems, siteChrome } from './siteChrome.js'
 import { useScrollSideIn, sideInAttr } from './useScrollSideIn.js'
+import { ensurePageStyles, scheduleIdle, cancelIdle } from './loadPageStyles.js'
 import GtmSnippets from './components/GtmSnippets.jsx'
 import {
   normalizeGtmSettings,
@@ -161,15 +162,20 @@ const WHATSAPP_LINK_LABEL = siteChrome.whatsappCta
 function optimizeHeroImageUrl(url, width = 960) {
   const raw = String(url || '').trim()
   if (!raw) return raw
+  if (raw.startsWith('/assets/hero-home')) return raw
+  if (raw.includes('photo-1497366811353')) return '/assets/hero-home.jpg'
   if (raw.includes('images.unsplash.com')) {
-    const next = raw.replace(/([?&])w=\d+/i, `$1w=${width}`).replace(/([?&])q=\d+/i, '$1q=75')
-    return next.includes('w=') ? next : `${next}${next.includes('?') ? '&' : '?'}w=${width}&q=75`
+    const next = raw.replace(/([?&])w=\d+/i, `$1w=${width}`).replace(/([?&])q=\d+/i, '$1q=70')
+    return next.includes('w=') ? next : `${next}${next.includes('?') ? '&' : '?'}w=${width}&q=70`
   }
   return raw
 }
 
 function heroImageSrcSet(url) {
   const raw = String(url || '').trim()
+  if (raw.startsWith('/assets/hero-home') || raw.includes('photo-1497366811353')) {
+    return '/assets/hero-home.jpg 960w'
+  }
   if (!raw.includes('images.unsplash.com')) return undefined
   return [640, 960, 1200]
     .map((width) => `${optimizeHeroImageUrl(raw, width)} ${width}w`)
@@ -1786,6 +1792,10 @@ function ScopeCompareSection({ data, defaults }) {
   const included = parseListItems(scope.includedItems)
   const excluded = parseListItems(scope.excludedItems)
 
+  useEffect(() => {
+    ensurePageStyles('comparison-cards', () => import('./comparison-cards.css'))
+  }, [])
+
   return (
     <section className="ip-scope-section section-blend" aria-label={scope.includedTitle}>
       <div className="ip-scope-header" data-animate={sideInAttr(0)}>
@@ -1837,6 +1847,10 @@ function PricingCompareSection({ pricing: pricingProp, defaults = pricingDefault
     sectionAriaLabel ||
     `${pricing.titlePrefix || ''} ${pricing.titleHighlight || ''}`.trim() ||
     'Pricing'
+
+  useEffect(() => {
+    ensurePageStyles('pricing-cards', () => import('./pricing-cards.css'))
+  }, [])
 
   return (
     <section className="ip-pricing-section section-blend" aria-label={ariaLabel}>
@@ -2287,6 +2301,10 @@ function ReviewsPage({ content }) {
 
   useScrollSideIn(rootRef, [reviewsConfig])
 
+  useEffect(() => {
+    ensurePageStyles('reviews-clone', () => import('./reviews-clone.css'))
+  }, [])
+
   return (
     <div ref={rootRef} className="reviews-clone-page">
       <section className="wp-review-header-section section-blend">
@@ -2621,6 +2639,10 @@ function ContactPage({ content }) {
   const telHref = `tel:${String(phone).replace(/\s/g, '')}`
 
   useScrollSideIn(rootRef, [page])
+
+  useEffect(() => {
+    ensurePageStyles('contact-clone', () => import('./contact-clone.css'))
+  }, [])
 
   return (
     <div ref={rootRef} className="contact-clone-page">

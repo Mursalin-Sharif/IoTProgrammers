@@ -702,19 +702,26 @@ const ensureContent = async () => {
   }
 
   const heroSlides = existing.home?.heroSlides || [];
-  if (
-    heroSlides.some((slide) => {
-      const cta = String(slide.ctaText || '').trim();
-      return cta === 'Contact Now' || cta === 'Contact now';
-    })
-  ) {
+  const needsHeroImagePatch = heroSlides.some((slide) =>
+    String(slide.imageUrl || '').trim().includes('photo-1497366811353'),
+  );
+  const needsHeroCtaPatch = heroSlides.some((slide) => {
+    const cta = String(slide.ctaText || '').trim();
+    return cta === 'Contact Now' || cta === 'Contact now';
+  });
+  if (needsHeroImagePatch || needsHeroCtaPatch) {
     patch['home.heroSlides'] = heroSlides.map((slide) => {
       const plain = slide.toObject?.() || slide;
+      let next = { ...plain };
+      const imageUrl = String(plain.imageUrl || '').trim();
+      if (imageUrl.includes('photo-1497366811353')) {
+        next = { ...next, imageUrl: '/assets/hero-home.jpg' };
+      }
       const cta = String(plain.ctaText || '').trim();
       if (cta === 'Contact Now' || cta === 'Contact now') {
-        return { ...plain, ctaText: homeWhatsappCta };
+        next = { ...next, ctaText: homeWhatsappCta };
       }
-      return plain;
+      return next;
     });
   }
 

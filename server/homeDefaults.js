@@ -9,8 +9,7 @@ const homeDefaults = {
       subtitle: 'Admin controlled banners · WhatsApp lead capture · Live demo access',
       ctaText: 'WhatsApp Now',
       ctaLink: 'https://wa.me/8801302003306',
-      imageUrl:
-        'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1600&q=80',
+      imageUrl: '/assets/hero-home.jpg',
     },
     {
       badge: 'IoTProgrammers',
