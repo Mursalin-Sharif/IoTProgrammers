@@ -1093,12 +1093,6 @@ function SiteFooter({ content }) {
   )
 }
 
-const getYoutubePosterUrl = (url) => {
-  const id = extractYoutubeId(url)
-  if (!id) return ''
-  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
-}
-
 function detectTouchUi() {
   if (typeof window === 'undefined') return true
   return (
