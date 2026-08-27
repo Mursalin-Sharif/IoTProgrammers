@@ -843,12 +843,12 @@ body.contact-route-body {
   inset: 0;
   z-index: 4;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   margin: 0;
-  padding: 0 16px 22px;
+  padding: 16px;
   border: 0;
-  background: linear-gradient(to top, rgba(6, 16, 31, 0.5), transparent 46%);
+  background: rgba(6, 16, 31, 0.22);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -857,16 +857,16 @@ body.contact-route-body {
 .landing-video-sound-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
+  gap: 10px;
+  padding: 14px 20px;
   border-radius: 999px;
   background: rgba(8, 17, 32, 0.94);
   color: #fff;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
 .landing-video-unmute-hit,
