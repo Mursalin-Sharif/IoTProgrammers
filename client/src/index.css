@@ -848,7 +848,7 @@ body.contact-route-body {
   margin: 0;
   padding: 0 16px 22px;
   border: 0;
-  background: transparent;
+  background: linear-gradient(to top, rgba(6, 16, 31, 0.5), transparent 46%);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -858,14 +858,15 @@ body.contact-route-body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-radius: 999px;
-  background: rgba(8, 17, 32, 0.92);
+  background: rgba(8, 17, 32, 0.94);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .landing-video-unmute-hit,

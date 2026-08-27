@@ -662,42 +662,39 @@ const stopYoutubePlayer = (iframe) => {
   }
 }
 
-let youtubeApiPromise
+const YOUTUBE_IFRAME_ALLOW =
+  'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen'
 
-const loadYoutubeIframeApi = () => {
-  if (typeof window === 'undefined') return Promise.resolve(null)
-  if (window.YT?.Player) return Promise.resolve(window.YT)
-  if (youtubeApiPromise) return youtubeApiPromise
+const mountLandingYoutubeIframe = (box, src) => {
+  if (!box || !src) return null
 
-  youtubeApiPromise = new Promise((resolve) => {
-    const finish = () => resolve(window.YT)
-    const previous = window.onYouTubeIframeAPIReady
-    window.onYouTubeIframeAPIReady = () => {
-      try {
-        previous?.()
-      } catch {
-        /* ignore */
-      }
-      finish()
-    }
+  const iframe = document.createElement('iframe')
+  iframe.className = 'landing-video-frame'
+  iframe.title = 'Landing intro video'
+  iframe.allow = YOUTUBE_IFRAME_ALLOW
+  iframe.allowFullscreen = true
+  iframe.setAttribute('allowfullscreen', 'true')
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin'
+  iframe.setAttribute('loading', 'eager')
+  box.replaceChildren(iframe)
+  // Set src after insert so iOS treats autoplay as part of the current gesture.
+  iframe.src = src
+  return iframe
+}
 
-    const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]')
-    if (!existing) {
-      const script = document.createElement('script')
-      script.src = 'https://www.youtube.com/iframe_api'
-      script.async = true
-      document.head.appendChild(script)
-    } else {
-      const poll = window.setInterval(() => {
-        if (window.YT?.Player) {
-          window.clearInterval(poll)
-          finish()
-        }
-      }, 40)
-    }
-  })
-
-  return youtubeApiPromise
+const unlockPageAudio = () => {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    const ctx = new Ctx()
+    const source = ctx.createBufferSource()
+    source.buffer = ctx.createBuffer(1, 1, 22050)
+    source.connect(ctx.destination)
+    source.start(0)
+    ctx.resume?.()
+  } catch {
+    /* ignore */
+  }
 }
 
 const VIDEO_PLAY_EVENT = 'iot-exclusive-video-play'
@@ -1268,145 +1265,76 @@ function SiteFooter({ content }) {
 function LandingIntroSection({ content, contentReady = false }) {
   const rootRef = useRef(null)
   const videoRef = useRef(null)
-  const youtubeHostRef = useRef(null)
-  const youtubePlayerRef = useRef(null)
+  const frameBoxRef = useRef(null)
+  const iframeRef = useRef(null)
   const soundUnlockedRef = useRef(false)
+  const liveSrcRef = useRef('')
   const playerId = useId()
   const [soundOn, setSoundOn] = useState(false)
-  const [youtubeReady, setYoutubeReady] = useState(false)
 
   const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
   const youtubeId = !isFileVideo ? extractYoutubeId(introVideoUrl) : ''
+  const mutedSrc = youtubeId ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true }) : ''
+  const liveSrc = youtubeId ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false }) : ''
   const showPlayer = Boolean(contentReady && introVideoUrl && (isFileVideo || youtubeId))
   const playerKey = isFileVideo ? introVideoUrl : youtubeId
-  const canUnlockSound = Boolean(showPlayer && (isFileVideo || youtubeReady) && !soundOn)
+  liveSrcRef.current = liveSrc
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl, contentReady])
 
-  const unlockSound = useCallback(
-    (event) => {
-      event?.preventDefault?.()
-      event?.stopPropagation?.()
-      if (soundOn || soundUnlockedRef.current) return
+  const unlockSound = useCallback(() => {
+    if (soundUnlockedRef.current) return
+    // Do not preventDefault: iOS cancels media unlock if the gesture is consumed.
 
-      requestExclusiveVideoPlay(playerId)
+    requestExclusiveVideoPlay(playerId)
+    unlockPageAudio()
 
-      if (isFileVideo) {
-        const video = videoRef.current
-        if (!video) return
-        video.muted = false
-        video.volume = 1
-        video.play()?.catch?.(() => {})
-        soundUnlockedRef.current = true
-        setSoundOn(true)
-        return
-      }
+    if (isFileVideo) {
+      const video = videoRef.current
+      if (!video) return
+      video.muted = false
+      video.volume = 1
+      video.play()?.catch?.(() => {})
+      soundUnlockedRef.current = true
+      setSoundOn(true)
+      return
+    }
 
-      const player = youtubePlayerRef.current
-      if (typeof player?.unMute !== 'function') return
-
-      try {
-        player.unMute()
-        player.setVolume?.(100)
-        player.playVideo?.()
-        soundUnlockedRef.current = true
-        setSoundOn(true)
-      } catch {
-        /* keep the tap layer */
-      }
-    },
-    [isFileVideo, playerId, soundOn],
-  )
+    const iframe = mountLandingYoutubeIframe(frameBoxRef.current, liveSrcRef.current)
+    if (!iframe) return
+    iframeRef.current = iframe
+    soundUnlockedRef.current = true
+    setSoundOn(true)
+    iframe.addEventListener('load', () => unmuteYoutubePlayer(iframe), { once: true })
+    unmuteYoutubePlayer(iframe)
+  }, [isFileVideo, playerId])
 
   useExclusiveVideo(playerId, () => {
     videoRef.current?.pause()
-    try {
-      youtubePlayerRef.current?.pauseVideo?.()
-      youtubePlayerRef.current?.mute?.()
-    } catch {
-      /* ignore */
+    if (iframeRef.current) {
+      postYoutubeCommand(iframeRef.current, 'pauseVideo')
+      postYoutubeCommand(iframeRef.current, 'mute')
     }
   })
 
   useEffect(() => {
     soundUnlockedRef.current = false
     setSoundOn(false)
-    setYoutubeReady(false)
   }, [playerKey])
 
   useEffect(() => {
-    if (!showPlayer || isFileVideo || !youtubeId) return undefined
+    if (!showPlayer || isFileVideo || !mutedSrc) return undefined
 
-    const root = youtubeHostRef.current
-    if (!root) return undefined
-
-    const mount = document.createElement('div')
-    mount.style.width = '100%'
-    mount.style.height = '100%'
-    root.replaceChildren(mount)
-
-    let destroyed = false
-    let player
-
-    loadYoutubeIframeApi().then((YT) => {
-      if (destroyed || !YT?.Player || !mount.isConnected) return
-
-      player = new YT.Player(mount, {
-        videoId: youtubeId,
-        width: '100%',
-        height: '100%',
-        playerVars: {
-          autoplay: 1,
-          mute: 1,
-          playsinline: 1,
-          rel: 0,
-          controls: 1,
-          modestbranding: 1,
-          origin: window.location.origin,
-          fs: 1,
-        },
-        events: {
-          onReady: (event) => {
-            if (destroyed) return
-            youtubePlayerRef.current = event.target
-            setYoutubeReady(true)
-            requestExclusiveVideoPlay(playerId)
-            try {
-              if (soundUnlockedRef.current) {
-                event.target.unMute()
-                event.target.setVolume(100)
-                event.target.playVideo()
-                setSoundOn(true)
-                return
-              }
-              event.target.mute()
-              event.target.playVideo()
-            } catch {
-              /* ignore */
-            }
-          },
-        },
-      })
-      youtubePlayerRef.current = player
-    })
+    const iframe = mountLandingYoutubeIframe(frameBoxRef.current, mutedSrc)
+    iframeRef.current = iframe
+    requestExclusiveVideoPlay(playerId)
 
     return () => {
-      destroyed = true
-      youtubePlayerRef.current = null
-      try {
-        player?.destroy?.()
-      } catch {
-        /* ignore */
-      }
-      root.replaceChildren()
+      iframeRef.current = null
+      frameBoxRef.current?.replaceChildren()
     }
-  }, [showPlayer, isFileVideo, youtubeId, playerId])
-
-  useEffect(() => {
-    if (!showPlayer) return undefined
-    requestExclusiveVideoPlay(playerId)
-  }, [showPlayer, playerId])
+  }, [showPlayer, isFileVideo, mutedSrc, playerId])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
@@ -1434,18 +1362,19 @@ function LandingIntroSection({ content, contentReady = false }) {
             onPlay={() => requestExclusiveVideoPlay(playerId)}
           />
         ) : youtubeId ? (
-          <div className="landing-video-frame" ref={youtubeHostRef} />
+          <div className="landing-video-frame" ref={frameBoxRef} />
         ) : (
           <div className="landing-video-placeholder">
             <p>ভিডিও লিংকটি সঠিক নয়। Admin থেকে একটি YouTube বা ভিডিও URL দিন।</p>
           </div>
         )}
 
-        {canUnlockSound ? (
+        {showPlayer && !soundOn ? (
           <button
             type="button"
             className="landing-video-sound-catch"
             aria-label="সাউন্ড চালু করুন"
+            onTouchStart={unlockSound}
             onPointerDown={unlockSound}
             onClick={unlockSound}
           >
