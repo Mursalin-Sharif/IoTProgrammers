@@ -1231,40 +1231,19 @@ function LandingIntroSection({ content, contentReady = false }) {
   const iframeRef = useRef(null)
   const videoRef = useRef(null)
   const playerId = useId()
-  const soundArmedRef = useRef(false)
-  const [playbackReady, setPlaybackReady] = useState(false)
-  const [isTouchUi, setIsTouchUi] = useState(false)
-  const [soundUnlocked, setSoundUnlocked] = useState(false)
 
   const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
   const youtubeId = !isFileVideo ? extractYoutubeId(introVideoUrl) : ''
-
-  // Mobile browsers block unmuted autoplay — start muted there, unmute on tap.
-  // Desktop can request sound immediately (mute=0).
-  const startMuted = isTouchUi
   const embedSrc =
     introVideoUrl && !isFileVideo
-      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: startMuted })
+      ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: false })
       : ''
-  const showPlayer = Boolean(
-    contentReady && playbackReady && introVideoUrl && (isFileVideo || embedSrc),
-  )
-  const playerKey = `${isFileVideo ? introVideoUrl : youtubeId || embedSrc}|m${startMuted ? 1 : 0}`
-  const showSoundGate = Boolean(showPlayer && isTouchUi && !soundUnlocked)
-
-  useEffect(() => {
-    const touch =
-      window.matchMedia('(pointer: coarse)').matches ||
-      window.matchMedia('(hover: none)').matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
-    setIsTouchUi(touch)
-    setPlaybackReady(true)
-  }, [])
+  const showPlayer = Boolean(contentReady && introVideoUrl && (isFileVideo || embedSrc))
+  const playerKey = isFileVideo ? introVideoUrl : youtubeId || embedSrc
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl, contentReady])
 
-  // Soft pause only — never blank/remount the intro iframe.
   useExclusiveVideo(playerId, () => {
     videoRef.current?.pause()
     if (iframeRef.current) {
@@ -1273,61 +1252,43 @@ function LandingIntroSection({ content, contentReady = false }) {
     }
   })
 
-  const unlockSound = () => {
-    if (soundArmedRef.current) return
-    soundArmedRef.current = true
-    setSoundUnlocked(true)
-    requestExclusiveVideoPlay(playerId)
-
-    if (isFileVideo) {
-      const video = videoRef.current
-      if (!video) {
-        soundArmedRef.current = false
-        setSoundUnlocked(false)
-        return
-      }
-      video.muted = false
-      video.volume = 1
-      video.play()?.catch?.(() => {})
-      return
-    }
-
-    unmuteYoutubePlayer(iframeRef.current)
-  }
-
   useEffect(() => {
     if (!showPlayer) return undefined
 
-    soundArmedRef.current = false
-    setSoundUnlocked(false)
     requestExclusiveVideoPlay(playerId)
 
-    // Desktop: try auto sound. Mobile: stay muted until explicit tap (browser policy).
-    if (isTouchUi) return undefined
-
     const armSound = () => {
-      if (soundArmedRef.current) return
-      unlockSound()
+      if (isFileVideo) {
+        const video = videoRef.current
+        if (!video) return
+        video.muted = false
+        video.volume = 1
+        video.play()?.catch?.(() => {})
+        return
+      }
+      unmuteYoutubePlayer(iframeRef.current)
     }
 
-    const timers = [120, 450, 1100].map((ms) => window.setTimeout(armSound, ms))
+    // Retry unmuted play — helps some Android browsers; iOS may still require a tap (OS policy).
+    const timers = [0, 120, 450, 1100, 2200].map((ms) => window.setTimeout(armSound, ms))
+
     const onGesture = () => armSound()
     window.addEventListener('pointerdown', onGesture, { once: true, capture: true })
+    window.addEventListener('touchstart', onGesture, { once: true, capture: true })
     window.addEventListener('keydown', onGesture, { once: true, capture: true })
 
     return () => {
       timers.forEach((id) => window.clearTimeout(id))
       window.removeEventListener('pointerdown', onGesture, true)
+      window.removeEventListener('touchstart', onGesture, true)
       window.removeEventListener('keydown', onGesture, true)
     }
-    // unlockSound reads latest refs; intentional deps are playback identity only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPlayer, isFileVideo, playerKey, playerId, isTouchUi])
+  }, [showPlayer, isFileVideo, playerKey, playerId])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
       <div className="landing-video-wrap">
-        {!contentReady || !playbackReady ? (
+        {!contentReady ? (
           <div className="landing-video-placeholder">
             <p>Loading video…</p>
           </div>
@@ -1342,7 +1303,7 @@ function LandingIntroSection({ content, contentReady = false }) {
             className="landing-video-player"
             src={introVideoUrl}
             autoPlay
-            muted={startMuted}
+            muted={false}
             loop
             playsInline
             controls
@@ -1362,7 +1323,7 @@ function LandingIntroSection({ content, contentReady = false }) {
             referrerPolicy="strict-origin-when-cross-origin"
             onLoad={() => {
               requestExclusiveVideoPlay(playerId)
-              if (!isTouchUi) unmuteYoutubePlayerOnce(iframeRef.current)
+              unmuteYoutubePlayer(iframeRef.current)
             }}
           />
         ) : (
@@ -1370,22 +1331,6 @@ function LandingIntroSection({ content, contentReady = false }) {
             <p>ভিডিও লিংকটি সঠিক নয়। Admin থেকে একটি YouTube বা ভিডিও URL দিন।</p>
           </div>
         )}
-
-        {showSoundGate ? (
-          <button
-            type="button"
-            className="landing-video-sound-play"
-            aria-label="Tap to play with sound"
-            onClick={unlockSound}
-            onTouchEnd={(event) => {
-              event.preventDefault()
-              unlockSound()
-            }}
-          >
-            <span className="landing-video-sound-play-icon" aria-hidden="true" />
-            <span className="landing-video-sound-play-label">সাউন্ড চালু করতে ট্যাপ করুন</span>
-          </button>
-        ) : null}
       </div>
 
       <div className="landing-intro-copy" data-animate={sideInAttr(0)}>
