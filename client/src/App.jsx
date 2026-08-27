@@ -662,9 +662,6 @@ const stopYoutubePlayer = (iframe) => {
   }
 }
 
-const YOUTUBE_IFRAME_ALLOW =
-  'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen'
-
 let youtubeApiPromise
 
 const loadYoutubeIframeApi = () => {
@@ -702,36 +699,58 @@ const loadYoutubeIframeApi = () => {
   return youtubeApiPromise
 }
 
-const mountLandingYoutubeIframe = (box, src, elementId) => {
-  if (!box || !src) return null
-
-  const iframe = document.createElement('iframe')
-  iframe.id = elementId
-  iframe.className = 'landing-video-frame'
-  iframe.title = 'Landing intro video'
-  iframe.allow = YOUTUBE_IFRAME_ALLOW
-  iframe.allowFullscreen = true
-  iframe.setAttribute('allowfullscreen', 'true')
-  iframe.referrerPolicy = 'strict-origin-when-cross-origin'
-  iframe.setAttribute('loading', 'eager')
-  box.replaceChildren(iframe)
-  iframe.src = src
-  return iframe
-}
-
 const unlockPageAudio = () => {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    const source = ctx.createBufferSource()
-    source.buffer = ctx.createBuffer(1, 1, 22050)
-    source.connect(ctx.destination)
-    source.start(0)
-    void ctx.resume?.()
+    if (Ctx) {
+      const ctx = new Ctx()
+      const source = ctx.createBufferSource()
+      source.buffer = ctx.createBuffer(1, 1, 22050)
+      source.connect(ctx.destination)
+      source.start(0)
+      void ctx.resume?.()
+    }
   } catch {
     /* ignore */
   }
+
+  try {
+    const beep = new Audio(
+      'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=',
+    )
+    beep.volume = 0.01
+    void beep.play()?.catch?.(() => {})
+  } catch {
+    /* ignore */
+  }
+}
+
+const forceYoutubeUnmute = (player) => {
+  if (!player || typeof player.unMute !== 'function') return false
+
+  try {
+    player.unMute()
+    player.setVolume?.(100)
+    player.playVideo?.()
+    player.unMute()
+  } catch {
+    return false
+  }
+
+  try {
+    const iframe = player.getIframe?.()
+    if (iframe) unmuteYoutubePlayer(iframe)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    if (typeof player.isMuted === 'function') return !player.isMuted()
+  } catch {
+    /* some embeds throw — treat as success after unMute() */
+  }
+
+  return true
 }
 
 const VIDEO_PLAY_EVENT = 'iot-exclusive-video-play'
@@ -1303,30 +1322,33 @@ function LandingIntroSection({ content, contentReady = false }) {
   const rootRef = useRef(null)
   const videoRef = useRef(null)
   const frameBoxRef = useRef(null)
-  const iframeRef = useRef(null)
   const ytPlayerRef = useRef(null)
-  const soundUnlockedRef = useRef(false)
+  const wantSoundRef = useRef(false)
+  const unlockAttemptsRef = useRef(0)
   const playerId = useId()
-  const hostDomId = `landing-intro-yt-${playerId.replace(/[^a-zA-Z0-9_-]/g, '')}`
   const [soundOn, setSoundOn] = useState(false)
   const [playerReady, setPlayerReady] = useState(false)
 
   const introVideoUrl = resolveMediaUrl(String(content.landing?.introVideoUrl || '').trim())
   const isFileVideo = Boolean(introVideoUrl && isDirectVideoFile(introVideoUrl))
   const youtubeId = !isFileVideo ? extractYoutubeId(introVideoUrl) : ''
-  // Always start muted — browsers block unmuted autoplay.
-  const mutedSrc = youtubeId ? getPlayableVideoUrl(introVideoUrl, { autoplay: true, muted: true }) : ''
   const showPlayer = Boolean(contentReady && introVideoUrl && (isFileVideo || youtubeId))
   const playerKey = isFileVideo ? introVideoUrl : youtubeId
-  const canUnlock = Boolean(showPlayer && !soundOn && (isFileVideo || playerReady))
+  const waitingForSound = Boolean(showPlayer && !soundOn)
 
   useScrollSideIn(rootRef, [content.landing?.headline, content.landing?.featuresText, introVideoUrl, contentReady])
 
-  const unlockSound = useCallback(() => {
-    if (soundUnlockedRef.current) return false
+  const markSoundOn = useCallback(() => {
+    wantSoundRef.current = true
+    setSoundOn(true)
+  }, [])
 
-    requestExclusiveVideoPlay(playerId)
+  const unlockSound = useCallback(() => {
+    if (soundOn) return true
+
+    wantSoundRef.current = true
     unlockPageAudio()
+    requestExclusiveVideoPlay(playerId)
 
     if (isFileVideo) {
       const video = videoRef.current
@@ -1334,134 +1356,147 @@ function LandingIntroSection({ content, contentReady = false }) {
       video.muted = false
       video.volume = 1
       video.play()?.catch?.(() => {})
-      soundUnlockedRef.current = true
-      setSoundOn(true)
+      markSoundOn()
       return true
     }
 
     const player = ytPlayerRef.current
     if (!player || typeof player.unMute !== 'function') {
-      // Player still booting — keep waiting for the next screen tap.
       return false
     }
 
-    try {
-      player.unMute()
-      player.setVolume?.(100)
-      player.playVideo?.()
-    } catch {
-      return false
+    unlockAttemptsRef.current += 1
+    const unmuted = forceYoutubeUnmute(player)
+
+    // Hide overlay once unmuted, or after repeated gestures (isMuted can lie on iOS).
+    if (unmuted || unlockAttemptsRef.current >= 2) {
+      markSoundOn()
+      return true
     }
 
-    const iframe = player.getIframe?.() || iframeRef.current
-    iframeRef.current = iframe || iframeRef.current
-    unmuteYoutubePlayer(iframeRef.current)
-
-    soundUnlockedRef.current = true
-    setSoundOn(true)
-    return true
-  }, [isFileVideo, playerId])
+    return false
+  }, [isFileVideo, markSoundOn, playerId, soundOn])
 
   useExclusiveVideo(playerId, () => {
     videoRef.current?.pause()
     try {
       ytPlayerRef.current?.pauseVideo?.()
-      ytPlayerRef.current?.mute?.()
     } catch {
       /* ignore */
-    }
-    if (iframeRef.current) {
-      postYoutubeCommand(iframeRef.current, 'pauseVideo')
-      postYoutubeCommand(iframeRef.current, 'mute')
     }
   })
 
   useEffect(() => {
-    soundUnlockedRef.current = false
+    wantSoundRef.current = false
+    unlockAttemptsRef.current = 0
     setSoundOn(false)
     setPlayerReady(false)
     ytPlayerRef.current = null
   }, [playerKey])
 
   useEffect(() => {
-    if (!showPlayer || isFileVideo || !mutedSrc || !youtubeId) return undefined
+    if (isFileVideo && showPlayer) setPlayerReady(true)
+  }, [isFileVideo, showPlayer])
 
-    const iframe = mountLandingYoutubeIframe(frameBoxRef.current, mutedSrc, hostDomId)
-    iframeRef.current = iframe
-    requestExclusiveVideoPlay(playerId)
+  useEffect(() => {
+    if (!showPlayer || isFileVideo || !youtubeId) return undefined
+
+    const box = frameBoxRef.current
+    if (!box) return undefined
+
+    const mount = document.createElement('div')
+    mount.style.width = '100%'
+    mount.style.height = '100%'
+    box.replaceChildren(mount)
 
     let destroyed = false
     let player
-    let attached = false
 
-    const attachPlayer = () => {
-      if (destroyed || attached || !iframe?.isConnected) return
-      attached = true
-      loadYoutubeIframeApi().then((YT) => {
-        if (destroyed || !YT?.Player || !iframe.isConnected) return
+    loadYoutubeIframeApi().then((YT) => {
+      if (destroyed || !YT?.Player || !mount.isConnected) return
 
-        player = new YT.Player(hostDomId, {
-          events: {
-            onReady: (event) => {
-              if (destroyed) return
-              ytPlayerRef.current = event.target
-              iframeRef.current = event.target.getIframe?.() || iframeRef.current
-              setPlayerReady(true)
-              try {
-                event.target.mute()
-                event.target.playVideo()
-                if (soundUnlockedRef.current) {
-                  event.target.unMute()
-                  event.target.setVolume(100)
-                  setSoundOn(true)
-                }
-              } catch {
-                /* ignore */
+      player = new YT.Player(mount, {
+        videoId: youtubeId,
+        width: '100%',
+        height: '100%',
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          playsinline: 1,
+          rel: 0,
+          controls: 1,
+          modestbranding: 1,
+          origin: window.location.origin,
+          fs: 1,
+        },
+        events: {
+          onReady: (event) => {
+            if (destroyed) return
+            ytPlayerRef.current = event.target
+            setPlayerReady(true)
+            try {
+              if (wantSoundRef.current) {
+                forceYoutubeUnmute(event.target)
+                markSoundOn()
+                return
               }
-            },
+              event.target.mute()
+              event.target.playVideo()
+            } catch {
+              /* ignore */
+            }
           },
-        })
-        ytPlayerRef.current = player
+          onStateChange: (event) => {
+            if (destroyed || !wantSoundRef.current) return
+            if (event.data === 1) {
+              const ok = forceYoutubeUnmute(event.target)
+              if (ok || unlockAttemptsRef.current >= 1) markSoundOn()
+            }
+          },
+        },
       })
-    }
-
-    if (iframe) {
-      iframe.addEventListener('load', attachPlayer, { once: true })
-      // Cached embeds may not fire load again.
-      window.setTimeout(attachPlayer, 300)
-    }
+      ytPlayerRef.current = player
+    })
 
     return () => {
       destroyed = true
       ytPlayerRef.current = null
-      iframeRef.current = null
       try {
         player?.destroy?.()
       } catch {
         /* ignore */
       }
-      frameBoxRef.current?.replaceChildren()
+      box.replaceChildren()
     }
-  }, [showPlayer, isFileVideo, mutedSrc, youtubeId, playerId, hostDomId])
+  }, [showPlayer, isFileVideo, youtubeId, markSoundOn])
 
-  // Any tap/click on the landing page screen unlocks sound (not only the video button).
+  // Tap / scroll-start / wheel / key — keep retrying until sound is confirmed.
   useEffect(() => {
-    if (!canUnlock) return undefined
+    if (!waitingForSound) return undefined
 
     const onGesture = () => {
       unlockSound()
     }
 
-    window.addEventListener('touchstart', onGesture, { capture: true, passive: true })
-    window.addEventListener('pointerdown', onGesture, { capture: true })
+    const opts = { capture: true, passive: true }
+    window.addEventListener('touchstart', onGesture, opts)
+    window.addEventListener('touchmove', onGesture, opts)
+    window.addEventListener('pointerdown', onGesture, opts)
+    window.addEventListener('wheel', onGesture, opts)
+    window.addEventListener('scroll', onGesture, opts)
+    document.addEventListener('scroll', onGesture, opts)
     window.addEventListener('keydown', onGesture, { capture: true })
 
     return () => {
       window.removeEventListener('touchstart', onGesture, true)
+      window.removeEventListener('touchmove', onGesture, true)
       window.removeEventListener('pointerdown', onGesture, true)
+      window.removeEventListener('wheel', onGesture, true)
+      window.removeEventListener('scroll', onGesture, true)
+      document.removeEventListener('scroll', onGesture, true)
       window.removeEventListener('keydown', onGesture, true)
     }
-  }, [canUnlock, unlockSound])
+  }, [waitingForSound, unlockSound])
 
   return (
     <section ref={rootRef} className="landing-intro-hero section-blend">
@@ -1500,18 +1535,20 @@ function LandingIntroSection({ content, contentReady = false }) {
           </div>
         )}
 
-        {showPlayer && !soundOn ? (
+        {waitingForSound ? (
           <button
             type="button"
             className="landing-video-sound-catch"
-            aria-label="সাউন্ড চালু করতে স্ক্রিনে ট্যাপ করুন"
+            aria-label="স্ক্রল বা ট্যাপ করলে সাউন্ড চালু হবে"
             onTouchStart={unlockSound}
             onPointerDown={unlockSound}
             onClick={unlockSound}
           >
             <span className="landing-video-sound-chip">
               <Volume2 size={18} strokeWidth={2.4} />
-              {canUnlock ? 'স্ক্রিনে ট্যাপ করুন — সাউন্ড চালু হবে' : 'ভিডিও লোড হচ্ছে…'}
+              {playerReady || isFileVideo
+                ? 'স্ক্রল বা ট্যাপ করুন — সাউন্ড চালু হবে'
+                : 'ভিডিও লোড হচ্ছে…'}
             </span>
           </button>
         ) : null}
