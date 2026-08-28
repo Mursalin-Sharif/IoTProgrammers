@@ -754,14 +754,13 @@ const forceYoutubeUnmute = (player) => {
 }
 
 const VIDEO_PLAY_EVENT = 'iot-exclusive-video-play'
-const CARD_VIDEO_SCOPE = 'card'
-const INTRO_VIDEO_SCOPE = 'intro'
+const PAGE_VIDEO_SCOPE = 'page'
 
-const requestExclusiveVideoPlay = (playerId, scope = CARD_VIDEO_SCOPE) => {
+const requestExclusiveVideoPlay = (playerId, scope = PAGE_VIDEO_SCOPE) => {
   window.dispatchEvent(new CustomEvent(VIDEO_PLAY_EVENT, { detail: { playerId, scope } }))
 }
 
-const useExclusiveVideo = (playerId, onForeignPlay, scope = CARD_VIDEO_SCOPE) => {
+const useExclusiveVideo = (playerId, onForeignPlay, scope = PAGE_VIDEO_SCOPE) => {
   const onForeignPlayRef = useRef(onForeignPlay)
   onForeignPlayRef.current = onForeignPlay
 
@@ -1351,7 +1350,7 @@ function LandingIntroSection({ content, contentReady = false }) {
 
     wantSoundRef.current = true
     unlockPageAudio()
-    requestExclusiveVideoPlay(playerId, INTRO_VIDEO_SCOPE)
+    requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
 
     if (isFileVideo) {
       const video = videoRef.current
@@ -1391,7 +1390,7 @@ function LandingIntroSection({ content, contentReady = false }) {
         /* ignore */
       }
     },
-    INTRO_VIDEO_SCOPE,
+    PAGE_VIDEO_SCOPE,
   )
 
   useEffect(() => {
@@ -1450,6 +1449,7 @@ function LandingIntroSection({ content, contentReady = false }) {
               }
               event.target.mute()
               event.target.playVideo()
+              requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
             } catch {
               /* ignore */
             }
@@ -1530,7 +1530,7 @@ function LandingIntroSection({ content, contentReady = false }) {
             controls
             preload="auto"
             onPlay={() => {
-              requestExclusiveVideoPlay(playerId, INTRO_VIDEO_SCOPE)
+              requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
               setPlayerReady(true)
             }}
             onLoadedData={() => setPlayerReady(true)}
@@ -1580,13 +1580,13 @@ function VideoLightbox({ open, url, title, isFile, onClose }) {
     () => {
       videoRef.current?.pause()
     },
-    CARD_VIDEO_SCOPE,
+    PAGE_VIDEO_SCOPE,
   )
 
   useEffect(() => {
     if (!open) return undefined
 
-    requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)
+    requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -1618,7 +1618,7 @@ function VideoLightbox({ open, url, title, isFile, onClose }) {
             controls
             autoPlay
             playsInline
-            onPlay={() => requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)}
+            onPlay={() => requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)}
           />
         ) : (
           <iframe
@@ -1628,7 +1628,7 @@ function VideoLightbox({ open, url, title, isFile, onClose }) {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
-            onLoad={() => requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)}
+            onLoad={() => requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)}
           />
         )}
       </div>
@@ -1651,8 +1651,7 @@ function CardVideoMedia({
   const rootRef = useRef(null)
   const videoRef = useRef(null)
   const iframeRef = useRef(null)
-  const preloadedRef = useRef(false)
-  const startingRef = useRef(false)
+  const lastActivateMsRef = useRef(0)
   const [playing, setPlaying] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [playerSrc, setPlayerSrc] = useState('about:blank')
@@ -1665,8 +1664,6 @@ function CardVideoMedia({
   const canPlay = Boolean(resolvedVideoUrl)
 
   const stopPlayback = useCallback(() => {
-    startingRef.current = false
-    preloadedRef.current = false
     setPlaying(false)
     setExpanded(false)
     videoRef.current?.pause()
@@ -1674,73 +1671,68 @@ function CardVideoMedia({
     setPlayerSrc('about:blank')
   }, [])
 
-  useExclusiveVideo(playerId, stopPlayback, CARD_VIDEO_SCOPE)
+  useExclusiveVideo(playerId, stopPlayback, PAGE_VIDEO_SCOPE)
 
-  const startInlinePlay = useCallback(
-    (event) => {
-      event?.preventDefault?.()
-      event?.stopPropagation?.()
-      if (!canPlay || startingRef.current) return
-      startingRef.current = true
+  const activatePlay = useCallback(() => {
+    const now = Date.now()
+    if (now - lastActivateMsRef.current < 400) return
+    lastActivateMsRef.current = now
+    if (!canPlay || playing) return
 
-      requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)
+    requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
 
-      if (isFileVideo) {
-        setPlaying(true)
-        window.setTimeout(() => {
-          const video = videoRef.current
-          if (!video) {
-            startingRef.current = false
-            return
-          }
-          video.muted = false
-          video.volume = 1
-          video.playsInline = true
-          video
-            .play()
-            ?.then?.(() => {
-              startingRef.current = false
-            })
-            ?.catch?.(() => {
-              video.muted = true
-              video.play()?.finally?.(() => {
-                startingRef.current = false
-              })
-            })
-        }, 0)
-        return
-      }
-
-      const iframe = iframeRef.current
-      if (iframe) {
-        if (!preloadedRef.current || !iframe.src || iframe.src === 'about:blank') {
-          iframe.src = hotMutedUrl
-          setPlayerSrc(hotMutedUrl)
-          preloadedRef.current = true
-        }
-        unmuteYoutubePlayer(iframe)
-      }
-
+    if (isFileVideo) {
       setPlaying(true)
-      startingRef.current = false
-    },
-    [canPlay, hotMutedUrl, isFileVideo, playerId],
-  )
+      return
+    }
 
-  const handleThumbnailActivate = useCallback(
-    (event) => {
-      startInlinePlay(event)
-    },
-    [startInlinePlay],
-  )
+    setPlayerSrc(hotMutedUrl)
+    setPlaying(true)
+  }, [canPlay, playing, hotMutedUrl, isFileVideo, playerId])
+
+  useEffect(() => {
+    if (!playing || !isFileVideo) return undefined
+
+    const timer = window.setTimeout(() => {
+      const video = videoRef.current
+      if (!video) return
+      video.muted = false
+      video.volume = 1
+      video.playsInline = true
+      video.play()?.catch?.(() => {
+        video.muted = true
+        video.play()?.catch?.(() => {})
+      })
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [playing, isFileVideo, resolvedVideoUrl])
+
+  useEffect(() => {
+    if (!playing || isFileVideo || playerSrc === 'about:blank') return undefined
+
+    const iframe = iframeRef.current
+    if (!iframe) return undefined
+
+    const onLoad = () => {
+      listenYoutubePlayer(iframe)
+      unmuteYoutubePlayer(iframe)
+      requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
+    }
+
+    iframe.addEventListener('load', onLoad)
+
+    return () => iframe.removeEventListener('load', onLoad)
+  }, [playing, isFileVideo, playerSrc, playerId])
 
   const renderThumbnailButton = (label) => (
     <button
       type="button"
       className={`thumbnail-button ${thumbnailClassName}`.trim()}
-      onPointerDown={handleThumbnailActivate}
-      onTouchStart={handleThumbnailActivate}
-      onClick={handleThumbnailActivate}
+      onClick={(event) => {
+        event.stopPropagation()
+        activatePlay()
+      }}
       disabled={!canPlay}
       aria-label={canPlay ? label : 'Add a video URL in admin to play'}
     >
@@ -1768,8 +1760,8 @@ function CardVideoMedia({
   )
 
   useEffect(() => {
-    onPlayReady?.(startInlinePlay)
-  }, [onPlayReady, startInlinePlay])
+    onPlayReady?.(activatePlay)
+  }, [onPlayReady, activatePlay])
 
   return (
     <>
@@ -1788,7 +1780,7 @@ function CardVideoMedia({
                 controls
                 autoPlay
                 playsInline
-                onPlay={() => requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)}
+                onPlay={() => requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)}
               />
             </div>
           ) : (
@@ -1807,10 +1799,6 @@ function CardVideoMedia({
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => {
-                  listenYoutubePlayer(iframeRef.current)
-                  if (playing) requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)
-                }}
               />
             </div>
 
@@ -1821,7 +1809,7 @@ function CardVideoMedia({
                 type="button"
                 className="card-video-expand"
                 onClick={() => {
-                  requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)
+                  requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
                   setExpanded(true)
                 }}
                 aria-label={`Expand ${title}`}
@@ -1837,7 +1825,7 @@ function CardVideoMedia({
             type="button"
             className="card-video-expand"
             onClick={() => {
-              requestExclusiveVideoPlay(playerId, CARD_VIDEO_SCOPE)
+              requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
               setExpanded(true)
             }}
             aria-label={`Expand ${title}`}

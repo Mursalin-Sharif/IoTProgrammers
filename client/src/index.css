@@ -1522,6 +1522,7 @@ body.contact-route-body {
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 2;
 }
 
 .product-media .thumbnail-button img {
@@ -1655,6 +1656,7 @@ body.contact-route-body {
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 2;
 }
 
 .demo-media.card-video-media .thumbnail-button img {
@@ -2188,6 +2190,7 @@ button.product-demo-link {
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 2;
 }
 
 .gallery-thumbnail-button {
