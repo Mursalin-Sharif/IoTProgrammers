@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
@@ -1682,18 +1682,7 @@ function CardVideoMedia({
     requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
 
     if (isFileVideo) {
-      setPlaying(true)
-      return
-    }
-
-    setPlayerSrc(hotMutedUrl)
-    setPlaying(true)
-  }, [canPlay, playing, hotMutedUrl, isFileVideo, playerId])
-
-  useEffect(() => {
-    if (!playing || !isFileVideo) return undefined
-
-    const timer = window.setTimeout(() => {
+      flushSync(() => setPlaying(true))
       const video = videoRef.current
       if (!video) return
       video.muted = false
@@ -1703,10 +1692,22 @@ function CardVideoMedia({
         video.muted = true
         video.play()?.catch?.(() => {})
       })
-    }, 0)
+      return
+    }
 
-    return () => window.clearTimeout(timer)
-  }, [playing, isFileVideo, resolvedVideoUrl])
+    const iframe = iframeRef.current
+    // Assign src inside the user gesture — async React state alone loses autoplay permission.
+    flushSync(() => {
+      setPlayerSrc(hotMutedUrl)
+      setPlaying(true)
+    })
+
+    if (iframe) {
+      iframe.src = hotMutedUrl
+      listenYoutubePlayer(iframe)
+      unmuteYoutubePlayer(iframe)
+    }
+  }, [canPlay, playing, hotMutedUrl, isFileVideo, playerId])
 
   useEffect(() => {
     if (!playing || isFileVideo || playerSrc === 'about:blank') return undefined
@@ -1717,22 +1718,27 @@ function CardVideoMedia({
     const onLoad = () => {
       listenYoutubePlayer(iframe)
       unmuteYoutubePlayer(iframe)
-      requestExclusiveVideoPlay(playerId, PAGE_VIDEO_SCOPE)
     }
 
     iframe.addEventListener('load', onLoad)
 
     return () => iframe.removeEventListener('load', onLoad)
-  }, [playing, isFileVideo, playerSrc, playerId])
+  }, [playing, isFileVideo, playerSrc])
+
+  const handlePlayActivate = useCallback(
+    (event) => {
+      event.stopPropagation()
+      activatePlay()
+    },
+    [activatePlay],
+  )
 
   const renderThumbnailButton = (label) => (
     <button
       type="button"
       className={`thumbnail-button ${thumbnailClassName}`.trim()}
-      onClick={(event) => {
-        event.stopPropagation()
-        activatePlay()
-      }}
+      onPointerUp={handlePlayActivate}
+      onClick={handlePlayActivate}
       disabled={!canPlay}
       aria-label={canPlay ? label : 'Add a video URL in admin to play'}
     >
