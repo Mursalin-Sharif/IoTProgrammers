@@ -895,14 +895,25 @@ function App() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const fetchContent = async () => {
+    let lastFetchedAt = 0
+    const STALE_MS = 5 * 60 * 1000
+
+    const fetchContent = async ({ force = false } = {}) => {
+      const isAdmin = window.location.pathname.startsWith('/admin')
+      if (!force && !isAdmin && lastFetchedAt && Date.now() - lastFetchedAt < STALE_MS) {
+        return
+      }
+
       try {
         const response = await axios.get(`${API_BASE}/api/content`, {
-          headers: { 'Cache-Control': 'no-store' },
-          params: { t: Date.now() },
+          timeout: 15000,
+          ...(isAdmin
+            ? { params: { refresh: '1' }, headers: { 'Cache-Control': 'no-cache' } }
+            : {}),
         })
         setContent(mergeContentWithDefaults(response.data))
         setError('')
+        lastFetchedAt = Date.now()
       } catch {
         setError('Backend unavailable. Showing fallback content.')
       } finally {
@@ -911,15 +922,16 @@ function App() {
       }
     }
 
-    fetchContent()
+    fetchContent({ force: true })
 
-    const refetchOnFocus = () => {
+    const refetchIfStale = () => {
       if (window.location.pathname.startsWith('/admin')) return
-      fetchContent()
+      if (document.visibilityState !== 'visible') return
+      fetchContent({ force: false })
     }
 
-    window.addEventListener('focus', refetchOnFocus)
-    return () => window.removeEventListener('focus', refetchOnFocus)
+    document.addEventListener('visibilitychange', refetchIfStale)
+    return () => document.removeEventListener('visibilitychange', refetchIfStale)
   }, [])
 
   const sharedProps = useMemo(

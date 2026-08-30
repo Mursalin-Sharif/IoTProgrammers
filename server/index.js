@@ -56,6 +56,35 @@ const uploadsDir = path.join(__dirname, 'uploads');
 let isMongoReady = false;
 let memoryContent;
 
+/** In-memory cache for GET /api/content — avoids hammering Mongo on every page view / tab focus. */
+const CONTENT_CACHE_TTL_MS = Number(process.env.CONTENT_CACHE_TTL_MS || 60_000);
+let contentCache = { payload: null, etag: null, expiresAt: 0 };
+
+const invalidateContentCache = () => {
+  contentCache = { payload: null, etag: null, expiresAt: 0 };
+};
+
+const createRateLimiter = ({ windowMs, max, message = 'Too many requests. Please try again shortly.' }) => {
+  const buckets = new Map();
+  return (req, res, next) => {
+    const key = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const now = Date.now();
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      return res.status(429).json({ message });
+    }
+    return next();
+  };
+};
+
+const loginRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, message: 'Too many login attempts.' });
+const uploadRateLimit = createRateLimiter({ windowMs: 60 * 1000, max: 30, message: 'Upload limit reached. Wait a minute.' });
+
 // Hostinger / reverse proxies
 app.set('trust proxy', 1);
 
@@ -491,7 +520,13 @@ memoryContent = structuredClone(defaultContent);
 
 const connectDb = async () => {
   try {
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_MS || 8000),
+      socketTimeoutMS: Number(process.env.MONGODB_SOCKET_TIMEOUT_MS || 45000),
+      maxPoolSize: Number(process.env.MONGODB_MAX_POOL_SIZE || 10),
+      minPoolSize: Number(process.env.MONGODB_MIN_POOL_SIZE || 1),
+      maxIdleTimeMS: Number(process.env.MONGODB_MAX_IDLE_MS || 30000),
+    });
     isMongoReady = true;
     console.log('MongoDB connected');
   } catch (error) {
@@ -499,6 +534,18 @@ const connectDb = async () => {
     console.error('MongoDB connection error:', error.message);
   }
 };
+
+mongoose.connection.on('disconnected', () => {
+  isMongoReady = false;
+  invalidateContentCache();
+  console.warn('MongoDB disconnected — serving cached/fallback content until reconnect');
+});
+
+mongoose.connection.on('reconnected', () => {
+  isMongoReady = true;
+  invalidateContentCache();
+  console.log('MongoDB reconnected');
+});
 
 const ensureContent = async () => {
   if (!isMongoReady) {
@@ -788,40 +835,19 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: Number(process.env.UPLOAD_MAX_BYTES || 8 * 1024 * 1024),
+    files: 1,
+  },
+});
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', mongo: isMongoReady ? 'connected' : 'offline' });
 });
 
-app.get('/api/content', async (_req, res) => {
-  res.set('Cache-Control', 'no-store');
-
-  if (!isMongoReady) {
-    return res.json(
-      withNormalizedLiveUrls({
-        ...memoryContent,
-        siteSettings: {
-          ...defaultContent.siteSettings,
-          ...(memoryContent.siteSettings || {}),
-        },
-      }),
-    );
-  }
-
-  const content = await SiteContent.findOne().lean();
-  const payload = content || defaultContent;
-  // Always expose tracking keys (empty string = no GTM injection on the client).
-  return res.json(
-    withNormalizedLiveUrls({
-      ...payload,
-      siteSettings: {
-        ...defaultContent.siteSettings,
-        ...(payload.siteSettings || {}),
-      },
-    }),
-  );
-});
+// GET /api/content is registered after withNormalizedLiveUrls (see below).
 
 const omitMongoMeta = (value) => {
   if (Array.isArray(value)) return value.map(omitMongoMeta);
@@ -880,6 +906,64 @@ const withNormalizedLiveUrls = (payload = {}) => {
   return next;
 };
 
+const buildPublicContentPayload = async () => {
+  if (!isMongoReady) {
+    return withNormalizedLiveUrls({
+      ...memoryContent,
+      siteSettings: {
+        ...defaultContent.siteSettings,
+        ...(memoryContent.siteSettings || {}),
+      },
+    });
+  }
+
+  const content = await SiteContent.findOne().lean();
+  const payload = content || defaultContent;
+  return withNormalizedLiveUrls({
+    ...payload,
+    siteSettings: {
+      ...defaultContent.siteSettings,
+      ...(payload.siteSettings || {}),
+    },
+  });
+};
+
+app.get('/api/content', async (req, res) => {
+  const now = Date.now();
+  const bypassCache = req.query.refresh === '1' || req.get('Cache-Control') === 'no-cache';
+
+  if (!bypassCache && contentCache.payload && contentCache.expiresAt > now) {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    if (contentCache.etag) {
+      res.set('ETag', contentCache.etag);
+      if (req.get('If-None-Match') === contentCache.etag) {
+        return res.status(304).end();
+      }
+    }
+    return res.json(contentCache.payload);
+  }
+
+  try {
+    const payload = await buildPublicContentPayload();
+    const etag = `"${crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex')}"`;
+    contentCache = {
+      payload,
+      etag,
+      expiresAt: now + CONTENT_CACHE_TTL_MS,
+    };
+    res.set('Cache-Control', bypassCache ? 'no-store' : 'public, max-age=60, stale-while-revalidate=300');
+    res.set('ETag', etag);
+    return res.json(payload);
+  } catch (error) {
+    console.error('GET /api/content failed:', error.message);
+    if (contentCache.payload) {
+      res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+      return res.json(contentCache.payload);
+    }
+    return res.status(503).json({ message: 'Content temporarily unavailable. Please retry.' });
+  }
+});
+
 const sanitizeContentPayload = (incoming = {}) => {
   const payload = omitMongoMeta(incoming);
 
@@ -928,24 +1012,19 @@ app.put('/api/content', requireAuth, async (req, res) => {
   try {
     if (!isMongoReady) {
       memoryContent = { ...memoryContent, ...incoming };
+      invalidateContentCache();
       return res.json(memoryContent);
     }
 
-    const existing = await SiteContent.findOne().lean();
-    if (!existing) {
-      const created = await SiteContent.create(incoming);
-      return res.json(created);
-    }
-
-    await SiteContent.collection.updateOne({ _id: existing._id }, { $set: incoming });
-    const saved = await SiteContent.findById(existing._id).lean();
+    const saved = await SiteContent.findOneAndUpdate({}, { $set: incoming }, { new: true, lean: true, upsert: true });
+    invalidateContentCache();
     return res.json(saved);
   } catch (error) {
     return res.status(400).json({ message: error.message || 'Could not save content' });
   }
 });
 
-app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAuth, uploadRateLimit, upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
   }
@@ -966,7 +1045,7 @@ app.delete('/api/upload/:filename', requireAuth, (req, res) => {
   return res.status(404).json({ message: 'File not found' });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginRateLimit, async (req, res) => {
   const username = String(req.body?.username || '').trim();
   const password = String(req.body?.password || '');
 
@@ -1072,17 +1151,38 @@ if (fs.existsSync(clientDistDir)) {
 }
 
 app.use((error, _req, res, _next) => {
+  if (error?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ message: 'File too large. Maximum upload size is 8MB.' });
+  }
   console.error(error);
   res.status(500).json({ message: error.message || 'Server error' });
 });
 
 connectDb().then(async () => {
-  await ensureContent();
-  await ensureAdminAuth();
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
     if (fs.existsSync(clientDistDir)) {
       console.log(`Serving client from ${clientDistDir}`);
     }
   });
+
+  try {
+    await ensureContent();
+    await ensureAdminAuth();
+  } catch (error) {
+    console.error('Startup migration failed:', error.message);
+  }
 });
+
+const shutdown = async (signal) => {
+  console.log(`${signal} received — closing server`);
+  try {
+    await mongoose.disconnect();
+  } catch {
+    /* ignore */
+  }
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
