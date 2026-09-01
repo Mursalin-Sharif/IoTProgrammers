@@ -3379,7 +3379,6 @@ function AdminLoginPage() {
           {loading ? 'Logging in...' : 'Login'}
         </button>
 
-        <p className="admin-login-hint">First time default: admin / admin123</p>
         <NavLink to="/" className="admin-login-back">
           Back to website
         </NavLink>
